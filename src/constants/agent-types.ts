@@ -3,21 +3,18 @@
  * This file provides type-safe access to dynamically loaded agent definitions
  */
 
-import { getAvailableAgentTypes, isValidAgentType as validateAgentType } from '../agents/agent-loader.js';
+import { 
+  getAvailableAgentTypes, 
+  isValidAgentType as validateAgentType,
+  resolveLegacyAgentType as resolveLegacy,
+  LEGACY_AGENT_MAPPING as LEGACY_MAPPING
+} from '../agents/agent-loader.js';
 
 // Dynamic agent type - will be a string that matches available agents
 export type AgentType = string;
 
-// Legacy agent type mapping for backward compatibility
-export const LEGACY_AGENT_MAPPING = {
-  analyst: 'code-analyzer',
-  coordinator: 'task-orchestrator', 
-  optimizer: 'perf-analyzer',
-  documenter: 'api-docs',
-  monitor: 'performance-benchmarker',
-  specialist: 'system-architect',
-  architect: 'system-architect',
-} as const;
+// Re-export legacy mapping from agent-loader
+export const LEGACY_AGENT_MAPPING = LEGACY_MAPPING;
 
 /**
  * Get all valid agent types dynamically
