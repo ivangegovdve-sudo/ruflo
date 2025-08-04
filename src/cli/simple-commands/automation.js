@@ -1,4 +1,7 @@
 import { printSuccess, printError, printWarning } from '../utils.js';
+import { WorkflowExecutor, loadWorkflowFromFile, getMLEStarWorkflowPath } from './automation-executor.js';
+import { existsSync } from 'fs';
+import { join } from 'path';
 
 // Simple ID generator
 function generateId(prefix = 'id') {
@@ -24,6 +27,12 @@ export async function automationAction(subArgs, flags) {
         break;
       case 'workflow-select':
         await workflowSelectCommand(subArgs, flags);
+        break;
+      case 'run-workflow':
+        await runWorkflowCommand(subArgs, flags);
+        break;
+      case 'mle-star':
+        await mleStarCommand(subArgs, flags);
         break;
       default:
         printError(`Unknown automation command: ${subcommand}`);
