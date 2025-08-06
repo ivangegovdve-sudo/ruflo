@@ -94,7 +94,7 @@ export class UserService {
     const user = await userRepository.findById(id);
     if (!user) return null;
 
-    const { password, ...userWithoutPassword } = user;
+    const { password: _, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
 
@@ -102,7 +102,7 @@ export class UserService {
     const user = await userRepository.findByEmail(email);
     if (!user) return null;
 
-    const { password, ...userWithoutPassword } = user;
+    const { password: _, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
 
