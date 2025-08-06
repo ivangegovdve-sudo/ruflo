@@ -329,46 +329,29 @@ class RealClaudeFlowExecutor:
     
     def execute_sparc(self, config: SparcCommand) -> RealExecutionResult:
         """Execute a real SPARC command."""
-        # For now, simulate SPARC by creating actual output
-        # Since SPARC requires interactive input, we'll create a simple hello world
+        # Build real SPARC command
+        command = [
+            self.claude_flow_path,
+            "sparc",
+            config.mode,
+            config.task
+        ]
         
-        start_time = time.time()
+        # Add output format if specified
+        if config.output_format:
+            command.extend(["--format", config.output_format])
         
-        # Create the hello world directory and file
-        output_dir = Path(config.task.split()[-1].strip('"').strip("'") if " in " in config.task else "./hello-bench")
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # Add file output if task contains a path
+        if " in " in config.task:
+            output_path = config.task.split(" in ")[-1].strip('"').strip("'")
+            command.extend(["--file", output_path])
         
-        # Create hello world file
-        hello_file = output_dir / "hello.mjs"
-        hello_content = """// Hello World function
-export function helloWorld() {
-    console.log("Hello, World!");
-}
-
-// Run if called directly
-import { fileURLToPath } from 'url';
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-    helloWorld();
-}
-"""
-        hello_file.write_text(hello_content)
+        # Add additional flags
+        if config.additional_flags:
+            command.extend(config.additional_flags)
         
-        # Test the file
-        test_cmd = ["node", str(hello_file)]
-        test_result = subprocess.run(test_cmd, capture_output=True, text=True, timeout=5)
-        
-        duration = time.time() - start_time
-        
-        return RealExecutionResult(
-            success=test_result.returncode == 0,
-            command=["sparc", config.mode, config.task],
-            exit_code=test_result.returncode,
-            duration=duration,
-            stdout_lines=[f"✅ Created {hello_file}", test_result.stdout] if test_result.stdout else [f"✅ Created {hello_file}"],
-            stderr_lines=[test_result.stderr] if test_result.stderr else [],
-            tasks_completed=1,
-            agents_spawned=1
-        )
+        # Try with a shorter timeout for SPARC (2 minutes)
+        return self._execute_streaming_command(command, 120)
     
     def _execute_streaming_command(self, command: List[str], timeout_seconds: int) -> RealExecutionResult:
         """Execute command and parse streaming output."""
