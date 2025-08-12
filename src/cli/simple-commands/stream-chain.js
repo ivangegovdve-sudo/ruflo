@@ -416,7 +416,7 @@ async function executeStreamStep(prompt, inputStream, isLast, flags = {}) {
         console.error('Error output:', errorOutput);
       }
 
-      resolve({
+      safeResolve({
         success: code === 0,
         duration,
         output,
