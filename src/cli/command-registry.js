@@ -541,6 +541,111 @@ For more information: https://github.com/ruvnet/claude-flow/issues/166`,
     ...fixHookVariablesCommandConfig,
   });
 
+  // Verification system commands
+  commandRegistry.set('verify', {
+    handler: async (args, flags) => {
+      try {
+        const { verificationCommand } = await import('./commands/verification.js');
+        return await verificationCommand({ subcommand: args[0] || 'status', ...flags });
+      } catch (error) {
+        console.error('❌ Error loading verification module:', error.message);
+        console.log('Please ensure the verification module is properly built.');
+      }
+    },
+    description: '🔍 Verification and truth enforcement system',
+    usage: 'verify <subcommand> [options]',
+    examples: [
+      'verify status                    # Show verification system status',
+      'verify check --taskId task-123   # Run verification checks',
+      'verify validate --taskId task-456 # Validate task results',
+      'verify config                    # Manage verification config',
+      'verify cleanup --force           # Clean up old verification data',
+    ],
+    details: `
+Verification system commands:
+  • status: Show current system status and health
+  • check: Run verification checks on tasks
+  • validate: Validate task completion and results
+  • config: Manage verification configuration
+  • cleanup: Clean up old verification data
+  • pre-task: Execute pre-task verification
+  • post-task: Execute post-task validation
+  • integration: Run integration tests
+  • truth: Execute truth telemetry checks
+  • rollback: Trigger rollback if needed
+
+Truth enforcement features:
+  • 0.95 minimum truth threshold
+  • Cross-agent integration testing
+  • Automated rollback on failures
+  • Cryptographic verification
+  • Byzantine fault tolerance`,
+  });
+
+  commandRegistry.set('truth', {
+    handler: async (args, flags) => {
+      try {
+        const { verificationCommand } = await import('./commands/verification.js');
+        return await verificationCommand({ subcommand: 'truth', ...flags });
+      } catch (error) {
+        console.error('❌ Error loading verification module:', error.message);
+        console.log('Please ensure the verification module is properly built.');
+      }
+    },
+    description: '🎯 Truth telemetry and accuracy scoring',
+    usage: 'truth [options]',
+    examples: [
+      'truth                            # Show current truth scores',
+      'truth --taskId task-123          # Check truth for specific task',
+      'truth --threshold 0.95           # Set minimum truth threshold',
+      'truth --report                   # Generate truth report',
+    ],
+    details: `
+Truth scoring system:
+  • Real-time truth metrics collection
+  • Agent performance scoring
+  • System-wide truth accuracy tracking
+  • Automated alerting for threshold violations
+  • Dashboard data export functionality
+
+Target metrics:
+  • >95% truth accuracy rate
+  • <10% human intervention rate
+  • >90% integration success rate
+  • <5% automated rollback frequency`,
+  });
+
+  commandRegistry.set('pair', {
+    handler: async (args, flags) => {
+      console.log('🤝 Pair Programming Mode');
+      console.log('');
+      console.log('The pair command enables collaborative development with:');
+      console.log('  • Real-time code review and validation');
+      console.log('  • Automated verification of changes');
+      console.log('  • Truth enforcement for all operations');
+      console.log('  • Integration testing on every change');
+      console.log('');
+      console.log('This feature integrates with the verification system to ensure');
+      console.log('all pair programming sessions maintain high quality standards.');
+      console.log('');
+      console.log('Coming soon in the next release!');
+    },
+    description: '👥 Pair programming with verification',
+    usage: 'pair [options]',
+    examples: [
+      'pair                             # Start pair programming mode',
+      'pair --verify                    # Enable real-time verification',
+      'pair --threshold 0.95            # Set quality threshold',
+    ],
+    details: `
+Pair programming features:
+  • Real-time code review
+  • Automated verification
+  • Truth enforcement
+  • Integration testing
+  • Quality gates`,
+  });
+
   commandRegistry.set('hive', {
     handler: async (args, flags) => {
       try {
