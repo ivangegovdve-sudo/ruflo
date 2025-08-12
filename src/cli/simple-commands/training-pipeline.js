@@ -277,7 +277,7 @@ describe('Sorting Algorithms', () => {
       const strategies = agentConfig.strategies || ['conservative', 'balanced', 'aggressive'];
       
       for (const strategy of strategies) {
-        const result = await this.executeRealTaskWithStrategy(task, strategy);
+        const result = await this.executeTaskWithStrategy(task, strategy);
         results.push({
           task: task.task,
           type: task.type,
