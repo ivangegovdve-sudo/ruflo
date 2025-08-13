@@ -141,11 +141,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Command System
 - **Stream Chain Infrastructure**:
-  - Subcommands: `run`, `demo`, `pipeline`, `test`, `monitor`, `kill`
+  - Subcommands: `run`, `demo`, `pipeline`, `test`
   - Pipeline types: `analysis`, `refactor`, `test`, `optimize`
-  - Background execution with process management
-  - Stream-JSON format support with <100ms latency
+  - Stream-JSON format support for context preservation
   - 100% context preservation between agents
+  - Sequential execution with configurable timeouts
   - O(1) memory usage via streaming
 
 #### Pair Programming System
