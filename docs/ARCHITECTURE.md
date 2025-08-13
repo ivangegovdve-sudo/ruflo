@@ -301,52 +301,123 @@ class MemoryManager {
 
 ### Swarm Topologies
 
-#### Centralized Topology
+Claude-Flow implements sophisticated swarm coordination patterns with real-time adaptation:
+
+#### 1. Centralized (Queen-Led) Topology
 
 ```
-         ┌──────────┐
-         │  Queen   │
-         └────┬─────┘
-              │
-    ┌─────────┼─────────┐
-    │         │         │
-┌───▼───┐ ┌──▼───┐ ┌───▼───┐
-│Worker1│ │Worker2│ │Worker3│
-└───────┘ └──────┘ └───────┘
+         ┌──────────────────┐
+         │   Queen Agent    │
+         │ ┌──────────────┐ │
+         │ │ Consensus    │ │
+         │ │ Engine       │ │
+         │ └──────────────┘ │
+         └─────────┬────────┘
+                   │ Commands
+    ┌──────────────┼──────────────┐
+    │              │              │
+┌───▼────┐   ┌────▼────┐   ┌────▼────┐
+│Worker1 │   │Worker2  │   │Worker3  │
+│(Coder) │   │(Tester) │   │(Review) │
+└───┬────┘   └────┬────┘   └────┬────┘
+    │             │             │
+    └─────────────┼─────────────┘
+                  ▼ Results
+         ┌─────────────────┐
+         │ Result Aggr.    │
+         └─────────────────┘
 ```
 
-#### Mesh Topology
+**Features:**
+- Byzantine fault tolerance with 66% threshold
+- Consensus-driven task allocation
+- Centralized result aggregation
+- Performance: 2.8-4.4x speed improvement
+
+#### 2. Mesh (Peer-to-Peer) Topology
 
 ```
-┌───────┐     ┌───────┐
-│Agent1 │◄────►Agent2 │
-└───┬───┘     └───┬───┘
-    │     ╳       │
-    │   ╱   ╲     │
-┌───▼───┐     ┌───▼───┐
-│Agent3 │◄────►Agent4 │
-└───────┘     └───────┘
+┌─────────────┐     ┌─────────────┐
+│   Agent1    │◄───►│   Agent2    │
+│ Researcher  │     │  Architect  │
+└─────┬───────┘     └─────┬───────┘
+      │       ╳             │
+      │     ╱   ╲           │
+      │   ╱       ╲         │
+┌─────▼─────┐     ┌───────▼─┐
+│  Agent3   │◄───►│  Agent4 │
+│  Coder    │     │  Monitor│
+└───────────┘     └─────────┘
 ```
 
-#### Hierarchical Topology
+**Features:**
+- Distributed consensus via voting
+- P2P communication with message routing
+- Adaptive load balancing
+- Fault-tolerant with circuit breakers
+
+#### 3. Hierarchical (Multi-Level) Topology
 
 ```
-           ┌──────────┐
-           │   Root   │
-           └────┬─────┘
-                │
-       ┌────────┴────────┐
-       │                 │
-  ┌────▼────┐      ┌────▼────┐
-  │Manager1 │      │Manager2 │
-  └────┬────┘      └────┬────┘
-       │                 │
-   ┌───┴───┐         ┌───┴───┐
-   │       │         │       │
-┌──▼─┐  ┌──▼─┐  ┌──▼─┐  ┌──▼─┐
-│ W1 │  │ W2 │  │ W3 │  │ W4 │
-└────┘  └────┘  └────┘  └────┘
+              ┌─────────────────────┐
+              │   Root Coordinator  │
+              │  ┌───────────────┐  │
+              │  │ Neural Pattern│  │
+              │  │ & Memory Mgmt │  │
+              │  └───────────────┘  │
+              └──────────┬──────────┘
+                         │
+            ┌────────────┴────────────┐
+            │                         │
+      ┌─────▼──────┐           ┌─────▼──────┐
+      │ Manager1   │           │ Manager2   │
+      │(Frontend)  │           │(Backend)   │
+      └─────┬──────┘           └─────┬──────┘
+            │                         │
+     ┌──────┴──────┐           ┌──────┴──────┐
+     │             │           │             │
+┌────▼────┐   ┌───▼────┐  ┌───▼────┐   ┌───▼────┐
+│React    │   │Mobile  │  │API     │   │Database│
+│Agent    │   │Agent   │  │Agent   │   │Agent   │
+└─────────┘   └────────┘  └────────┘   └────────┘
 ```
+
+**Features:**
+- Multi-tier command hierarchy
+- Domain-specific agent clusters
+- Resource pooling and optimization
+- Cross-cluster communication
+
+#### 4. Distributed (Cloud-Native) Topology
+
+```
+┌─────────────────────────────────────────────────────┐
+│              Load Balancer                          │
+└─────────────────┬───────────────────────────────────┘
+                  │
+     ┌────────────┼────────────┐
+     │            │            │
+┌────▼────┐  ┌───▼────┐  ┌───▼────┐
+│Region 1 │  │Region 2│  │Region 3│
+│ ┌─────┐ │  │ ┌─────┐│  │ ┌─────┐│
+│ │Agent│ │  │ │Agent││  │ │Agent││
+│ │Pool │ │  │ │Pool ││  │ │Pool ││
+│ └─────┘ │  │ └─────┘│  │ └─────┘│
+└─────────┘  └────────┘  └────────┘
+     │            │            │
+     └────────────┼────────────┘
+                  ▼
+      ┌─────────────────────┐
+      │ Distributed Memory  │
+      │ & State Management  │
+      └─────────────────────┘
+```
+
+**Features:**
+- Geographic distribution
+- Auto-scaling based on load
+- Distributed state synchronization
+- Edge computing capabilities
 
 ---
 
