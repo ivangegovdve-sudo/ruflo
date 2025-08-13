@@ -1340,52 +1340,311 @@ scrape_configs:
       - targets: ['redis-exporter:9121']
 ```
 
+### Production Backup Strategy
+
+```bash
+#!/bin/bash
+# scripts/backup.sh - Production backup script
+
+set -euo pipefail
+
+BACKUP_DIR="/backups/$(date +%Y/%m/%d)"
+DATE=$(date +%Y%m%d_%H%M%S)
+RETENTION_DAYS=30
+S3_BUCKET="claude-flow-backups"
+
+# Create backup directory
+mkdir -p "$BACKUP_DIR"
+
+# Database backup
+echo "Starting PostgreSQL backup..."
+pg_dump "$DATABASE_URL" | gzip > "$BACKUP_DIR/postgres_$DATE.sql.gz"
+
+# Redis backup
+echo "Starting Redis backup..."
+redis-cli -u "$REDIS_URL" --rdb "$BACKUP_DIR/redis_$DATE.rdb"
+gzip "$BACKUP_DIR/redis_$DATE.rdb"
+
+# Configuration backup
+echo "Backing up configurations..."
+kubectl get secret claude-flow-secrets -n claude-flow -o yaml > "$BACKUP_DIR/secrets_$DATE.yaml"
+kubectl get configmap claude-flow-config -n claude-flow -o yaml > "$BACKUP_DIR/config_$DATE.yaml"
+
+# Application data backup
+echo "Backing up application data..."
+tar -czf "$BACKUP_DIR/app-data_$DATE.tar.gz" /app/data /app/memory
+
+# Upload to S3
+echo "Uploading backups to S3..."
+aws s3 cp "$BACKUP_DIR/" "s3://$S3_BUCKET/$(date +%Y/%m/%d)/" --recursive
+
+# Cleanup old backups
+echo "Cleaning up old backups..."
+find /backups -type f -mtime +$RETENTION_DAYS -delete
+aws s3 ls "s3://$S3_BUCKET/" --recursive | while read -r line; do
+    createDate=$(echo $line | awk '{print $1" "$2}')
+    createDate=$(date -d "$createDate" +%s)
+    olderThan=$(date -d "$RETENTION_DAYS days ago" +%s)
+    if [[ $createDate -lt $olderThan ]]; then
+        fileName=$(echo $line | awk '{$1=$2=$3=""; print $0}' | sed 's/^[ \t]*//')
+        aws s3 rm "s3://$S3_BUCKET/$fileName"
+    fi
+done
+
+echo "Backup completed successfully!"
+
+# Send notification
+curl -X POST -H 'Content-type: application/json' \
+    --data "{\"text\":\"✅ Claude Flow backup completed: $DATE\"}" \
+    "$SLACK_WEBHOOK_URL"
+```
+
+---
+
+## Security Configuration
+
+### Secrets Management with AWS Secrets Manager
+
+```bash
+# Create secrets in AWS Secrets Manager
+aws secretsmanager create-secret \
+    --name "claude-flow/api-keys" \
+    --description "Claude Flow API keys" \
+    --secret-string '{
+        "claude-api-key": "sk-ant-api03-...",
+        "openai-api-key": "sk-...",
+        "github-token": "ghp_..."
+    }'
+
+aws secretsmanager create-secret \
+    --name "claude-flow/database" \
+    --description "Database connection details" \
+    --secret-string '{
+        "url": "postgresql://claude_flow:password@hostname:5432/claude_flow",
+        "password": "secure-password"
+    }'
+
+aws secretsmanager create-secret \
+    --name "claude-flow/jwt" \
+    --description "JWT and encryption secrets" \
+    --secret-string '{
+        "jwt-secret": "your-jwt-secret-256-bits",
+        "encryption-key": "your-encryption-key-256-bits"
+    }'
+```
+
+### WAF Configuration
+
+```json
+{
+  "Name": "claude-flow-waf",
+  "Scope": "CLOUDFRONT",
+  "DefaultAction": {
+    "Allow": {}
+  },
+  "Rules": [
+    {
+      "Name": "AWSManagedRulesCommonRuleSet",
+      "Priority": 1,
+      "OverrideAction": {
+        "None": {}
+      },
+      "Statement": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesCommonRuleSet"
+        }
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "CommonRuleSetMetric"
+      }
+    },
+    {
+      "Name": "RateLimitRule",
+      "Priority": 2,
+      "Action": {
+        "Block": {}
+      },
+      "Statement": {
+        "RateBasedStatement": {
+          "Limit": 2000,
+          "AggregateKeyType": "IP"
+        }
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "RateLimitMetric"
+      }
+    }
+  ]
+}
+```
+
+---
+
+## Load Balancing
+
+### AWS Application Load Balancer
+
+```bash
+# Create ALB
+aws elbv2 create-load-balancer \
+    --name claude-flow-alb \
+    --subnets subnet-12345 subnet-67890 \
+    --security-groups sg-12345 \
+    --scheme internet-facing \
+    --type application \
+    --ip-address-type ipv4
+
+# Create target group
+aws elbv2 create-target-group \
+    --name claude-flow-targets \
+    --protocol HTTP \
+    --port 3000 \
+    --vpc-id vpc-12345 \
+    --target-type ip \
+    --health-check-enabled \
+    --health-check-interval-seconds 30 \
+    --health-check-path /health \
+    --health-check-protocol HTTP \
+    --health-check-timeout-seconds 5 \
+    --healthy-threshold-count 2 \
+    --unhealthy-threshold-count 2
+
+# Create listener
+aws elbv2 create-listener \
+    --load-balancer-arn arn:aws:elasticloadbalancing:us-west-2:123456789:loadbalancer/app/claude-flow-alb/1234567890abcdef \
+    --protocol HTTPS \
+    --port 443 \
+    --certificates CertificateArn=arn:aws:acm:us-west-2:123456789:certificate/12345678-1234-1234-1234-123456789012 \
+    --default-actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-west-2:123456789:targetgroup/claude-flow-targets/1234567890abcdef
+```
+
 ---
 
 ## Cloud Deployment
 
-### AWS Deployment
+### AWS Production Deployment
 
-#### Using AWS ECS
+#### EKS Cluster Setup
 
 ```bash
-# Create task definition
-aws ecs register-task-definition \
-  --family claude-flow \
-  --requires-compatibilities FARGATE \
-  --network-mode awsvpc \
-  --cpu 1024 \
-  --memory 2048 \
-  --container-definitions file://task-definition.json
+#!/bin/bash
+# Deploy Claude Flow to AWS EKS
 
-# Create service
+# Variables
+CLUSTER_NAME="claude-flow-production"
+REGION="us-west-2"
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+# Create EKS cluster
+eksctl create cluster \
+  --name $CLUSTER_NAME \
+  --version 1.28 \
+  --region $REGION \
+  --nodegroup-name claude-flow-workers \
+  --node-type m5.large \
+  --nodes 3 \
+  --nodes-min 3 \
+  --nodes-max 20 \
+  --with-oidc \
+  --ssh-access \
+  --ssh-public-key ~/.ssh/id_rsa.pub \
+  --managed
+
+# Install AWS Load Balancer Controller
+eksctl create iamserviceaccount \
+  --cluster=$CLUSTER_NAME \
+  --namespace=kube-system \
+  --name=aws-load-balancer-controller \
+  --attach-policy-arn=arn:aws:iam::$ACCOUNT_ID:policy/AWSLoadBalancerControllerIAMPolicy \
+  --override-existing-serviceaccounts \
+  --approve
+
+helm repo add eks https://aws.github.io/eks-charts
+helm repo update
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName=$CLUSTER_NAME \
+  --set serviceAccount.create=false \
+  --set serviceAccount.name=aws-load-balancer-controller
+
+# Install EBS CSI driver
+eksctl create addon \
+  --name aws-ebs-csi-driver \
+  --cluster $CLUSTER_NAME \
+  --service-account-role-arn arn:aws:iam::$ACCOUNT_ID:role/AmazonEKS_EBS_CSI_DriverRole
+
+echo "EKS cluster $CLUSTER_NAME created successfully!"
+```
+
+#### ECS Fargate Deployment
+
+```json
+{
+  "family": "claude-flow",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "2048",
+  "memory": "4096",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT:role/claudeFlowTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "claude-flow",
+      "image": "ACCOUNT.dkr.ecr.us-west-2.amazonaws.com/claude-flow:2.0.0",
+      "portMappings": [
+        {"containerPort": 3000, "protocol": "tcp"},
+        {"containerPort": 8080, "protocol": "tcp"}
+      ],
+      "environment": [
+        {"name": "NODE_ENV", "value": "production"},
+        {"name": "CLAUDE_FLOW_MAX_AGENTS", "value": "100"}
+      ],
+      "secrets": [
+        {
+          "name": "CLAUDE_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-west-2:ACCOUNT:secret:claude-flow/api-keys:claude-api-key::"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/claude-flow",
+          "awslogs-region": "us-west-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ]
+}
+```
+
+```bash
+# Deploy ECS service
+aws ecs create-cluster --cluster-name claude-flow-production
+
+aws ecs register-task-definition --cli-input-json file://task-definition.json
+
 aws ecs create-service \
-  --cluster default \
+  --cluster claude-flow-production \
   --service-name claude-flow \
   --task-definition claude-flow:1 \
   --desired-count 3 \
   --launch-type FARGATE \
-  --network-configuration file://network-config.json
-```
-
-#### Using AWS Lambda
-
-```javascript
-// handler.js
-const { ClaudeFlow } = require('claude-flow');
-
-exports.handler = async (event) => {
-  const claudeFlow = new ClaudeFlow({
-    apiKey: process.env.CLAUDE_API_KEY
-  });
-  
-  const result = await claudeFlow.execute(event.task);
-  
-  return {
-    statusCode: 200,
-    body: JSON.stringify(result)
-  };
-};
+  --network-configuration "awsvpcConfiguration={subnets=[subnet-12345,subnet-67890],securityGroups=[sg-12345],assignPublicIp=DISABLED}" \
+  --load-balancers "targetGroupArn=arn:aws:elasticloadbalancing:us-west-2:ACCOUNT:targetgroup/claude-flow/12345,containerName=claude-flow,containerPort=3000" \
+  --enable-logging
 ```
 
 ### Google Cloud Platform
