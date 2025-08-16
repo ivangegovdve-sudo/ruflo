@@ -22,6 +22,16 @@ await import('./implementations/agent-tracker.js').catch(() => {
   }
 });
 
+// Initialize DAA manager
+await import('./implementations/daa-tools.js').catch(() => {
+  // If ES module import fails, try require
+  try {
+    require('./implementations/daa-tools');
+  } catch (e) {
+    console.log('DAA manager not loaded');
+  }
+});
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
