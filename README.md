@@ -27,7 +27,10 @@
 - **💾 SQLite Memory System**: Persistent `.swarm/memory.db` with 12 specialized tables
 - **🪝 Advanced Hooks System**: Automated workflows with pre/post operation hooks
 - **📊 GitHub Integration**: 6 specialized modes for repository management
+<<<<<<< HEAD
 - **🌐 Flow Nexus Cloud Platform**: E2B sandboxes, AI swarms, challenges, and marketplace integration
+=======
+>>>>>>> 111288bf7f290136a7f1ee0ba55549071d6dacca
 
 > 🔥 **Revolutionary AI Coordination**: Build faster, smarter, and more efficiently with AI-powered development orchestration
 
