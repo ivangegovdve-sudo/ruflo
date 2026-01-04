@@ -145,54 +145,50 @@ export class SwarmHub implements ISwarmHub {
   }
 
   // ==========================================================================
-  // Lifecycle
+  // Lifecycle - DELEGATES to UnifiedSwarmCoordinator
   // ==========================================================================
 
+  /**
+   * @deprecated Delegates to UnifiedSwarmCoordinator.initialize()
+   */
   async initialize(config?: Partial<SwarmConfig>): Promise<void> {
-    if (this.initialized) {
-      throw new Error('SwarmHub is already initialized');
-    }
-
-    this.config = { ...this.config, ...config };
     this.startTime = Date.now();
-
     this.initializeMilestones();
 
+    // Start compatibility layer components
     (this.agentRegistry as AgentRegistry).startHealthChecks();
 
-    this.initialized = true;
+    // DELEGATE to canonical coordinator
+    await this.coordinator.initialize();
 
     await this.eventBus.emit(swarmInitializedEvent({
-      topology: this.config.topology,
-      maxAgents: this.config.maxAgents,
+      topology: this.coordinator.getTopology(),
+      maxAgents: 15,
       performanceTargets: V3_PERFORMANCE_TARGETS
     }));
 
-    console.log(`[SwarmHub] Initialized with ${this.config.topology} topology`);
+    console.log(`[SwarmHub] COMPATIBILITY LAYER: Initialized via UnifiedSwarmCoordinator`);
   }
 
+  /**
+   * @deprecated Delegates to UnifiedSwarmCoordinator.shutdown()
+   */
   async shutdown(): Promise<void> {
-    if (!this.initialized) {
-      return;
-    }
-
+    // Stop compatibility layer components
     (this.agentRegistry as AgentRegistry).stopHealthChecks();
 
-    const activeAgents = this.agentRegistry.getActiveAgents();
-    for (const agent of activeAgents) {
-      try {
-        await this.terminateAgent(agent.id);
-      } catch (err) {
-        console.error(`[SwarmHub] Error terminating agent ${agent.id}: ${err}`);
-      }
-    }
+    // DELEGATE to canonical coordinator
+    await this.coordinator.shutdown();
 
-    this.initialized = false;
-    console.log('[SwarmHub] Shutdown complete');
+    console.log('[SwarmHub] COMPATIBILITY LAYER: Shutdown complete');
   }
 
+  /**
+   * @deprecated Check UnifiedSwarmCoordinator state instead
+   */
   isInitialized(): boolean {
-    return this.initialized;
+    const state = this.coordinator.getState();
+    return state.status !== 'stopped' && state.status !== 'initializing';
   }
 
   // ==========================================================================
