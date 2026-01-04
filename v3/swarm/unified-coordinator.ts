@@ -246,16 +246,22 @@ export class UnifiedSwarmCoordinator extends EventEmitter implements IUnifiedSwa
     // Stop background processes
     this.stopBackgroundProcesses();
 
-    // Shutdown components
+    // Shutdown all components including domain pools
     await Promise.all([
       this.messageBus.shutdown(),
       this.consensusEngine.shutdown(),
       ...Array.from(this.agentPools.values()).map(pool => pool.shutdown()),
+      ...Array.from(this.domainPools.values()).map(pool => pool.shutdown()),
     ]);
 
-    // Clear agents and tasks
+    // Clear all tracking data
     this.state.agents.clear();
     this.state.tasks.clear();
+    this.agentDomainMap.clear();
+    this.taskAssignments.clear();
+    for (const queue of this.domainTaskQueues.values()) {
+      queue.length = 0;
+    }
 
     this.state.status = 'stopped';
 
