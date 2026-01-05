@@ -37,5 +37,8 @@ export * from './fixtures/index.js';
 // Mocks - Service mock implementations
 export * from './mocks/index.js';
 
+// Regression Testing - Prevent capability degradation
+export * from './regression/index.js';
+
 // Re-export commonly used Vitest utilities
 export { vi, expect, describe, it, test, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
