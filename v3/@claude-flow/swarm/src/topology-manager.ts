@@ -21,6 +21,11 @@ export class TopologyManager extends EventEmitter implements ITopologyManager {
   private adjacencyList: Map<string, Set<string>> = new Map();
   private lastRebalance: Date = new Date();
 
+  // O(1) role-based indexes for performance (fixes O(n) find operations)
+  private roleIndex: Map<TopologyNode['role'], Set<string>> = new Map();
+  private queenNode: TopologyNode | null = null;
+  private coordinatorNode: TopologyNode | null = null;
+
   constructor(config: Partial<TopologyConfig> = {}) {
     super();
     this.config = {
