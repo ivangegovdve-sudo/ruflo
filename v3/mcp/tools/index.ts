@@ -139,6 +139,9 @@ export function getAllTools(): MCPTool[] {
     ...memoryTools,
     ...configTools,
     ...hooksTools,
+    ...taskTools,
+    ...systemTools,
+    ...sessionTools,
   ];
 }
 
