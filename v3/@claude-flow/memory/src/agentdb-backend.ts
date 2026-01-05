@@ -328,6 +328,7 @@ export class AgentDBBackend extends EventEmitter implements IMemoryBackend {
 
     // Remove from indexes
     this.entries.delete(id);
+    this.unregisterIdMapping(id); // Clean up reverse lookup map
     this.namespaceIndex.get(entry.namespace)?.delete(id);
     const keyIndexKey = `${entry.namespace}:${entry.key}`;
     this.keyIndex.delete(keyIndexKey);
