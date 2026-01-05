@@ -213,12 +213,39 @@ export class HttpTransport extends EventEmitter implements ITransport {
       contentSecurityPolicy: false, // Allow for flexibility
     }));
 
-    // CORS
+    // CORS - Secure defaults (no wildcard in production)
     if (this.config.corsEnabled !== false) {
+      const allowedOrigins = this.config.corsOrigins;
+
+      // SECURITY: Reject wildcard CORS in production unless explicitly configured
+      if (!allowedOrigins || allowedOrigins.length === 0) {
+        this.logger.warn('CORS: No origins configured, restricting to same-origin only');
+      }
+
       this.app.use(cors({
-        origin: this.config.corsOrigins || '*',
+        origin: (origin, callback) => {
+          // Allow requests with no origin (same-origin, curl, etc.)
+          if (!origin) {
+            callback(null, true);
+            return;
+          }
+
+          // Check against allowed origins
+          if (allowedOrigins && allowedOrigins.length > 0) {
+            if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+              callback(null, true);
+            } else {
+              callback(new Error(`CORS: Origin '${origin}' not allowed`));
+            }
+          } else {
+            // No origins configured - reject cross-origin requests
+            callback(new Error('CORS: Cross-origin requests not allowed'));
+          }
+        },
         credentials: true,
         maxAge: 86400,
+        methods: ['GET', 'POST', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
       }));
     }
 
