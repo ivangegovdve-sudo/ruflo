@@ -27,13 +27,15 @@ import {
   Security,
 } from '../../src/index.js';
 
-// Import @ruvector/learning-wasm for production LoRA adaptation
-// @ts-expect-error - @ruvector/learning-wasm types may not be available
-import { LoRAEngine, EWCManager } from '@ruvector/learning-wasm';
-
-// Import @ruvector/wasm for pattern storage
-// @ts-expect-error - @ruvector/wasm types may not be available
-import { VectorDB as RuVectorDB } from '@ruvector/wasm';
+// Import shared vector utilities (consolidated from all plugins)
+import {
+  IVectorDB,
+  ILoRAEngine,
+  LoRAAdapter,
+  createVectorDB,
+  createLoRAEngine,
+  generateHashEmbedding,
+} from './shared/vector-utils.js';
 
 // ============================================================================
 // Types

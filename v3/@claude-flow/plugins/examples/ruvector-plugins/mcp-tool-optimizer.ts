@@ -27,13 +27,14 @@ import {
   Security,
 } from '../../src/index.js';
 
-// Import @ruvector/wasm for HNSW pattern matching
-// @ts-expect-error - @ruvector/wasm types may not be available
-import { VectorDB as RuVectorDB } from '@ruvector/wasm';
-
-// Import @ruvector/learning-wasm for pattern learning
-// @ts-expect-error - @ruvector/learning-wasm types may not be available
-import { LoRAEngine } from '@ruvector/learning-wasm';
+// Import shared vector utilities (consolidated from all plugins)
+import {
+  IVectorDB,
+  ILoRAEngine,
+  createVectorDB,
+  createLoRAEngine,
+  generateHashEmbedding,
+} from './shared/vector-utils.js';
 
 // ============================================================================
 // Types
