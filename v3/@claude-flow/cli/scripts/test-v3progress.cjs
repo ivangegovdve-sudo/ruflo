@@ -5,7 +5,7 @@
 const path = require('path');
 const fs = require('fs');
 
-const projectRoot = path.resolve(__dirname, '../../..');
+const projectRoot = path.resolve(__dirname, '../../../..');
 const v3Path = path.join(projectRoot, 'v3');
 const cliPath = path.join(v3Path, '@claude-flow', 'cli', 'src');
 
