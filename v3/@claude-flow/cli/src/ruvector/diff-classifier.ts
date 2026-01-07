@@ -461,6 +461,9 @@ export function getGitDiffNumstat(ref: string = 'HEAD'): DiffFile[] {
  * Async version of getGitDiffNumstat for non-blocking operation
  */
 export async function getGitDiffNumstatAsync(ref: string = 'HEAD'): Promise<DiffFile[]> {
+  // SECURITY: Validate git ref to prevent command injection
+  validateGitRef(ref);
+
   // Check cache first
   const cacheKey = `numstat:${ref}`;
   const cached = diffCache.get(cacheKey);
@@ -468,15 +471,21 @@ export async function getGitDiffNumstatAsync(ref: string = 'HEAD'): Promise<Diff
     return cached.files;
   }
 
-  const { exec } = require('child_process');
+  const { execFile } = require('child_process');
   const { promisify } = require('util');
-  const execAsync = promisify(exec);
+  const execFileAsync = promisify(execFile);
 
   try {
-    const { stdout } = await execAsync(
-      `git diff --numstat --diff-filter=ACDMRTUXB ${ref} && echo "---STATUS---" && git diff --name-status ${ref}`,
-      { maxBuffer: 10 * 1024 * 1024 }
-    );
+    // SECURITY: Use execFile with args array instead of shell string
+    const { stdout: numstatOutput } = await execFileAsync('git', [
+      'diff', '--numstat', '--diff-filter=ACDMRTUXB', ref
+    ], { maxBuffer: 10 * 1024 * 1024 });
+
+    const { stdout: statusOutput } = await execFileAsync('git', [
+      'diff', '--name-status', ref
+    ], { maxBuffer: 10 * 1024 * 1024 });
+
+    const stdout = numstatOutput + '---STATUS---' + statusOutput;
 
     const [numstatPart, statusPart] = stdout.split('---STATUS---');
 
