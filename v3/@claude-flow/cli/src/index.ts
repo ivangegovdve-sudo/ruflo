@@ -11,7 +11,7 @@ import { dirname, join } from 'path';
 import type { Command, CommandContext, CommandResult, V3Config, CLIError } from './types.js';
 import { CommandParser, commandParser } from './parser.js';
 import { OutputFormatter, output } from './output.js';
-import { commands, commandRegistry, getCommand, getCommandNames } from './commands/index.js';
+import { commands, commandRegistry, getCommand, getCommandAsync, getCommandNames, hasCommand } from './commands/index.js';
 import { suggestCommand } from './suggest.js';
 
 // Read version from package.json at runtime
