@@ -49,7 +49,7 @@
   },
   "dependencies": {
     "@claude-flow/shared": "^3.0.0-alpha.1",
-    "@claude-flow/aidefence": "^3.0.0-alpha.1"
+    "@claude-flow/aidefence": "^3.0.2"
   },
   "publishConfig": {
     "access": "public",
