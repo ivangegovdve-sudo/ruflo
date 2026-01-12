@@ -983,6 +983,111 @@ claude-flow migrate rollback --backup-id backup-1704369600
 
 ---
 
+### `embeddings` - Vector Embeddings
+
+ONNX-based embeddings with hyperbolic space (Poincaré ball), semantic search, and neural substrate integration.
+
+```bash
+claude-flow embeddings <subcommand> [options]
+```
+
+#### Subcommands
+
+| Subcommand | Description |
+|------------|-------------|
+| `init` | Initialize ONNX model and hyperbolic configuration |
+| `generate` | Generate embeddings for text |
+| `search` | Semantic similarity search with HNSW |
+| `compare` | Compare similarity between texts |
+| `collections` | Manage embedding collections/namespaces |
+| `index` | Manage HNSW indexes (build, rebuild, optimize) |
+| `providers` | List available embedding providers |
+| `chunk` | Document chunking with configurable overlap |
+| `normalize` | L2/L1/minmax/zscore normalization |
+| `hyperbolic` | Hyperbolic embedding operations (Poincaré ball) |
+| `neural` | Neural substrate features (drift, memory, swarm) |
+| `models` | List and download ONNX models |
+| `cache` | Manage persistent SQLite cache |
+
+#### Supported Models
+
+| Model | Dimensions | Size | Use Case |
+|-------|------------|------|----------|
+| `all-MiniLM-L6-v2` | 384 | 23MB | Fast, general purpose (default) |
+| `all-mpnet-base-v2` | 768 | 110MB | Higher quality, more compute |
+| `bge-small-en-v1.5` | 384 | 33MB | BGE family, good for retrieval |
+
+#### Hyperbolic Embeddings
+
+The Poincaré ball model provides:
+- **Better hierarchical representation** - Exponential capacity in low dimensions
+- **Distance preservation** - Geodesic distance preserves hierarchy
+- **Use cases** - Taxonomies, org charts, file systems, knowledge graphs
+
+#### Examples
+
+```bash
+# Initialize embedding subsystem with defaults
+claude-flow embeddings init
+
+# Use larger model with custom curvature
+claude-flow embeddings init --model all-mpnet-base-v2 --curvature -0.5
+
+# Euclidean only (no hyperbolic)
+claude-flow embeddings init --no-hyperbolic
+
+# Generate embedding
+claude-flow embeddings generate -t "Implement OAuth2 authentication"
+
+# Semantic search
+claude-flow embeddings search -q "authentication patterns" --limit 10
+
+# Compare texts
+claude-flow embeddings compare --text1 "Hello" --text2 "Hi there"
+
+# Document chunking
+claude-flow embeddings chunk -t "Long document..." --max-size 512 --overlap 50
+
+# Hyperbolic operations
+claude-flow embeddings hyperbolic -a convert
+
+# Neural substrate (drift detection, memory physics)
+claude-flow embeddings neural --init
+claude-flow embeddings neural -f drift
+
+# Download model
+claude-flow embeddings models -d all-mpnet-base-v2
+
+# Cache stats
+claude-flow embeddings cache
+```
+
+#### Configuration File
+
+After `embeddings init`, configuration is stored in `.claude-flow/embeddings.json`:
+
+```json
+{
+  "model": "all-MiniLM-L6-v2",
+  "modelPath": ".claude-flow/models",
+  "dimension": 384,
+  "cacheSize": 256,
+  "hyperbolic": {
+    "enabled": true,
+    "curvature": -1,
+    "epsilon": 1e-15,
+    "maxNorm": 0.99999
+  },
+  "neural": {
+    "enabled": true,
+    "driftThreshold": 0.3,
+    "decayRate": 0.01
+  }
+}
+```
+
+---
+
 ### `doctor` - System Diagnostics
 
 System health checks with automatic fix suggestions.
