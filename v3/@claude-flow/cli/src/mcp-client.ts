@@ -52,6 +52,7 @@ registerTools([
   ...analyzeTools,
   ...progressTools,
   ...embeddingsTools,
+  ...claimsTools,
 ]);
 
 /**
