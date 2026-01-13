@@ -359,14 +359,26 @@ export const performanceTools: MCPTool[] = [
 
       savePerfStore(store);
 
+      // Calculate comparison vs previous benchmarks
+      const allBenchmarks = Object.values(store.benchmarks);
+      const previousBenchmarks = allBenchmarks
+        .filter(b => suitesToRun.includes(b.name) && b.createdAt < results[0]?.name)
+        .slice(-suitesToRun.length);
+
+      const comparison = previousBenchmarks.length > 0
+        ? {
+            vsPrevious: `${results.reduce((sum, r) => sum + r.opsPerSec, 0) > previousBenchmarks.reduce((sum, b) => sum + b.results.opsPerSecond, 0) ? '+' : ''}${Math.round(((results.reduce((sum, r) => sum + r.opsPerSec, 0) / previousBenchmarks.reduce((sum, b) => sum + b.results.opsPerSecond, 0)) - 1) * 100)}% vs previous`,
+            totalBenchmarks: allBenchmarks.length,
+          }
+        : { note: 'First benchmark run - no comparison available', totalBenchmarks: allBenchmarks.length };
+
       return {
+        _real: true,
         suite,
         iterations,
+        warmup,
         results,
-        comparison: {
-          vsBaseline: '+15% improvement',
-          vsPrevious: '+3% improvement',
-        },
+        comparison,
         timestamp: new Date().toISOString(),
       };
     },
