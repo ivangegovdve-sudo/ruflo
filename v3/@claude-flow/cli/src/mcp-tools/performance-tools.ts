@@ -267,31 +267,80 @@ export const performanceTools: MCPTool[] = [
       const store = loadPerfStore();
       const suite = (input.suite as string) || 'all';
       const iterations = (input.iterations as number) || 100;
+      const warmup = input.warmup !== false;
 
-      const benchmarks: Record<string, { ops: number; latency: number; memory: number }> = {
-        memory: { ops: 50000 + Math.floor(Math.random() * 10000), latency: 0.02, memory: 5 },
-        neural: { ops: 1000 + Math.floor(Math.random() * 500), latency: 1.5, memory: 50 },
-        swarm: { ops: 500 + Math.floor(Math.random() * 200), latency: 5, memory: 100 },
-        io: { ops: 10000 + Math.floor(Math.random() * 5000), latency: 0.5, memory: 10 },
+      // REAL benchmark functions
+      const benchmarkFunctions: Record<string, () => void> = {
+        memory: () => {
+          // Real memory allocation benchmark
+          const arr = new Array(1000).fill(0).map(() => Math.random());
+          arr.sort();
+        },
+        neural: () => {
+          // Real computation benchmark (matrix-like operations)
+          const size = 64;
+          const a = Array.from({ length: size }, () => Array.from({ length: size }, () => Math.random()));
+          const b = Array.from({ length: size }, () => Array.from({ length: size }, () => Math.random()));
+          // Simple matrix multiplication
+          for (let i = 0; i < size; i++) {
+            for (let j = 0; j < size; j++) {
+              let sum = 0;
+              for (let k = 0; k < size; k++) sum += a[i][k] * b[k][j];
+            }
+          }
+        },
+        swarm: () => {
+          // Real object creation and manipulation
+          const agents = Array.from({ length: 10 }, (_, i) => ({ id: i, status: 'active', tasks: [] as number[] }));
+          agents.forEach(a => { for (let i = 0; i < 100; i++) a.tasks.push(i); });
+          agents.sort((a, b) => a.tasks.length - b.tasks.length);
+        },
+        io: () => {
+          // Real JSON serialization benchmark
+          const data = { agents: Array.from({ length: 50 }, (_, i) => ({ id: i, name: `agent-${i}` })) };
+          const json = JSON.stringify(data);
+          JSON.parse(json);
+        },
       };
 
-      const results: Array<{ name: string; opsPerSec: number; avgLatency: string; memoryUsage: string }> = [];
+      const results: Array<{ name: string; opsPerSec: number; avgLatency: string; memoryUsage: string; _real: boolean }> = [];
+      const suitesToRun = suite === 'all' ? Object.keys(benchmarkFunctions) : [suite];
 
-      const suitesToRun = suite === 'all' ? Object.keys(benchmarks) : [suite];
+      // Warmup phase
+      if (warmup) {
+        for (const suiteName of suitesToRun) {
+          const fn = benchmarkFunctions[suiteName];
+          if (fn) for (let i = 0; i < 10; i++) fn();
+        }
+      }
 
+      // Real benchmarks with actual timing
       for (const suiteName of suitesToRun) {
-        const bench = benchmarks[suiteName];
-        if (bench) {
+        const fn = benchmarkFunctions[suiteName];
+        if (fn) {
+          const memBefore = process.memoryUsage().heapUsed;
+          const startTime = performance.now();
+
+          for (let i = 0; i < iterations; i++) fn();
+
+          const endTime = performance.now();
+          const memAfter = process.memoryUsage().heapUsed;
+
+          const durationMs = endTime - startTime;
+          const opsPerSec = Math.round((iterations / durationMs) * 1000);
+          const avgLatencyMs = durationMs / iterations;
+          const memoryDelta = Math.round((memAfter - memBefore) / 1024);
+
           const id = `bench-${suiteName}-${Date.now()}`;
           const result: Benchmark = {
             id,
             name: suiteName,
             type: 'performance',
             results: {
-              duration: iterations * (bench.latency / 1000),
+              duration: durationMs / 1000,
               iterations,
-              opsPerSecond: bench.ops,
-              memory: bench.memory,
+              opsPerSecond: opsPerSec,
+              memory: Math.max(0, memoryDelta),
             },
             createdAt: new Date().toISOString(),
           };
@@ -300,9 +349,10 @@ export const performanceTools: MCPTool[] = [
 
           results.push({
             name: suiteName,
-            opsPerSec: bench.ops,
-            avgLatency: `${bench.latency}ms`,
-            memoryUsage: `${bench.memory}MB`,
+            opsPerSec,
+            avgLatency: `${avgLatencyMs.toFixed(3)}ms`,
+            memoryUsage: `${Math.abs(memoryDelta)}KB`,
+            _real: true,
           });
         }
       }
