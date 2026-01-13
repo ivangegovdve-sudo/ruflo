@@ -654,26 +654,50 @@ export const embeddingsTools: MCPTool[] = [
           }
 
         default: // status
-          return {
-            success: true,
-            action: 'status',
-            neural: {
-              enabled: config.neural.enabled,
-              ruvector: config.neural.ruvector || { enabled: false },
-              features: config.neural.features || {},
-              metrics: {
-                driftThreshold: config.neural.driftThreshold,
-                decayRate: config.neural.decayRate,
+          // Get real neural system status
+          try {
+            const { getIntelligenceStats, benchmarkAdaptation, initializeIntelligence } = await import('../memory/intelligence.js');
+            await initializeIntelligence();
+            const stats = getIntelligenceStats();
+            const benchmark = benchmarkAdaptation(50);
+            return {
+              success: true,
+              action: 'status',
+              neural: {
+                enabled: config.neural.enabled,
+                sonaEnabled: stats.sonaEnabled,
+                ruvector: config.neural.ruvector || { enabled: false },
+                features: config.neural.features || {},
+                realMetrics: {
+                  patternsLearned: stats.patternsLearned,
+                  trajectoriesRecorded: stats.trajectoriesRecorded,
+                  reasoningBankSize: stats.reasoningBankSize,
+                  adaptationTime: `${(benchmark.avgMs * 1000).toFixed(2)}μs`,
+                  targetMet: benchmark.targetMet,
+                  lastAdaptation: stats.lastAdaptation
+                    ? new Date(stats.lastAdaptation).toISOString()
+                    : null,
+                },
               },
-            },
-            capabilities: [
-              'SONA (Self-Optimizing Neural Architecture)',
-              'Flash Attention (2.49x-7.47x speedup)',
-              'EWC++ (Elastic Weight Consolidation)',
-              'Semantic Drift Detection',
-              'Memory Physics (hippocampal dynamics)',
-            ],
-          };
+              capabilities: [
+                stats.sonaEnabled ? '✅ SONA Active' : '❌ SONA Inactive',
+                benchmark.targetMet ? '✅ <0.05ms Target Met' : '⚠️ Target Not Met',
+                `${stats.patternsLearned} patterns learned`,
+                `${stats.trajectoriesRecorded} trajectories recorded`,
+              ],
+            };
+          } catch {
+            return {
+              success: true,
+              action: 'status',
+              neural: {
+                enabled: config.neural.enabled,
+                ruvector: config.neural.ruvector || { enabled: false },
+                features: config.neural.features || {},
+              },
+              message: 'Intelligence module not available - showing config only',
+            };
+          }
       }
     },
   },
