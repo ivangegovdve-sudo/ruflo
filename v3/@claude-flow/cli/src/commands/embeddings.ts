@@ -1317,22 +1317,113 @@ const cacheCommand: Command = {
     output.writeln(output.bold('Embedding Cache'));
     output.writeln(output.dim('─'.repeat(50)));
 
+    const fs = await import('fs');
+    const path = await import('path');
+
+    // Get real cache stats
+    const resolvedDbPath = path.resolve(dbPath);
+    let sqliteEntries = 0;
+    let sqliteSize = '0 B';
+    let sqliteExists = false;
+
+    try {
+      if (fs.existsSync(resolvedDbPath)) {
+        sqliteExists = true;
+        const stats = fs.statSync(resolvedDbPath);
+        const sizeBytes = stats.size;
+
+        // Format size
+        if (sizeBytes >= 1024 * 1024) {
+          sqliteSize = `${(sizeBytes / 1024 / 1024).toFixed(1)} MB`;
+        } else if (sizeBytes >= 1024) {
+          sqliteSize = `${(sizeBytes / 1024).toFixed(1)} KB`;
+        } else {
+          sqliteSize = `${sizeBytes} B`;
+        }
+
+        // Try to count real entries via sql.js
+        try {
+          const initSqlJs = (await import('sql.js')).default;
+          const SQL = await initSqlJs();
+          const fileBuffer = fs.readFileSync(resolvedDbPath);
+          const db = new SQL.Database(fileBuffer);
+          const result = db.exec('SELECT COUNT(*) as count FROM embeddings');
+          if (result.length > 0 && result[0].values.length > 0) {
+            sqliteEntries = result[0].values[0][0] as number;
+          }
+          db.close();
+        } catch {
+          // Estimate entries from file size (~1600 bytes per entry for 384-dim embeddings)
+          sqliteEntries = Math.floor(stats.size / 1600);
+        }
+      }
+    } catch { /* file access error */ }
+
+    // Get in-memory cache stats from actual cache if available
+    let memoryEntries = 0;
+    let memorySize = '0 B';
+    try {
+      const { getCacheStats } = await import('../memory/memory-initializer.js');
+      const cacheStats = getCacheStats();
+      if (cacheStats) {
+        memoryEntries = cacheStats.entries || 0;
+        const memBytes = memoryEntries * 384 * 4; // Float32 = 4 bytes per dimension
+        if (memBytes >= 1024 * 1024) {
+          memorySize = `${(memBytes / 1024 / 1024).toFixed(1)} MB`;
+        } else if (memBytes >= 1024) {
+          memorySize = `${(memBytes / 1024).toFixed(1)} KB`;
+        } else {
+          memorySize = `${memBytes} B`;
+        }
+      }
+    } catch { /* cache not initialized */ }
+
+    if (action === 'clear') {
+      try {
+        if (fs.existsSync(resolvedDbPath)) {
+          fs.unlinkSync(resolvedDbPath);
+          output.writeln(output.success('Cache cleared!'));
+        } else {
+          output.writeln(output.dim('No cache to clear.'));
+        }
+        return { success: true };
+      } catch (error) {
+        output.printError(`Failed to clear cache: ${error}`);
+        return { success: false };
+      }
+    }
+
+    // Display real stats
     output.printTable({
       columns: [
         { key: 'cache', header: 'Cache Type', width: 18 },
         { key: 'entries', header: 'Entries', width: 12 },
-        { key: 'hitRate', header: 'Hit Rate', width: 12 },
+        { key: 'status', header: 'Status', width: 12 },
         { key: 'size', header: 'Size', width: 12 },
       ],
       data: [
-        { cache: 'LRU (Memory)', entries: '256', hitRate: output.success('94.2%'), size: '2.1 MB' },
-        { cache: 'SQLite (Disk)', entries: '8,432', hitRate: output.success('87.5%'), size: '45.2 MB' },
+        {
+          cache: 'LRU (Memory)',
+          entries: String(memoryEntries),
+          status: memoryEntries > 0 ? output.success('Active') : output.dim('Empty'),
+          size: memorySize,
+        },
+        {
+          cache: 'SQLite (Disk)',
+          entries: String(sqliteEntries),
+          status: sqliteExists ? output.success('Active') : output.dim('Not Found'),
+          size: sqliteSize,
+        },
       ],
     });
 
     output.writeln();
-    output.writeln(output.dim(`Database: ${dbPath}`));
-    output.writeln(output.dim('Persistent cache survives restarts'));
+    output.writeln(output.dim(`Database: ${resolvedDbPath}`));
+    if (sqliteExists) {
+      output.writeln(output.dim('Persistent cache survives restarts'));
+    } else {
+      output.writeln(output.dim('Cache will be created on first embedding operation'));
+    }
 
     return { success: true };
   },
