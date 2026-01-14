@@ -58,8 +58,15 @@ function getUserInfo() {
   let modelName = 'Unknown';
 
   try {
-    name = execSync('git config user.name 2>/dev/null || echo "user"', { encoding: 'utf-8' }).trim();
-    gitBranch = execSync('git branch --show-current 2>/dev/null || echo ""', { encoding: 'utf-8' }).trim();
+    const gitUserCmd = isWindows
+      ? 'git config user.name 2>NUL || echo user'
+      : 'git config user.name 2>/dev/null || echo "user"';
+    const gitBranchCmd = isWindows
+      ? 'git branch --show-current 2>NUL || echo.'
+      : 'git branch --show-current 2>/dev/null || echo ""';
+    name = execSync(gitUserCmd, { encoding: 'utf-8' }).trim();
+    gitBranch = execSync(gitBranchCmd, { encoding: 'utf-8' }).trim();
+    if (gitBranch === '.') gitBranch = ''; // Windows echo. outputs a dot
   } catch (e) {
     // Ignore errors
   }
