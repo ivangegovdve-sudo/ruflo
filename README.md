@@ -276,6 +276,201 @@ Claude-Flow v3 is built on rigorous architectural specifications with full trace
 └─────────────┘  └─────────────┘
 ```
 
+### 🏗️ Architecture Diagrams
+
+<details open>
+<summary>📊 <strong>System Overview</strong> — High-level architecture</summary>
+
+```mermaid
+flowchart TB
+    subgraph User["👤 User Layer"]
+        CC[Claude Code]
+        CLI[CLI Commands]
+    end
+
+    subgraph Orchestration["🎯 Orchestration Layer"]
+        MCP[MCP Server]
+        Router[Intelligent Router]
+        Hooks[Self-Learning Hooks]
+    end
+
+    subgraph Agents["🤖 Agent Layer"]
+        Queen[Queen Coordinator]
+        Workers[54+ Specialized Agents]
+        Swarm[Swarm Manager]
+    end
+
+    subgraph Intelligence["🧠 Intelligence Layer"]
+        SONA[SONA Learning]
+        MoE[Mixture of Experts]
+        HNSW[HNSW Vector Search]
+    end
+
+    subgraph Providers["☁️ Provider Layer"]
+        Anthropic[Anthropic]
+        OpenAI[OpenAI]
+        Google[Google]
+        Ollama[Ollama]
+    end
+
+    CC --> MCP
+    CLI --> MCP
+    MCP --> Router
+    Router --> Hooks
+    Hooks --> Queen
+    Queen --> Workers
+    Queen --> Swarm
+    Workers --> Intelligence
+    Intelligence --> Providers
+```
+
+</details>
+
+<details>
+<summary>🔄 <strong>Request Flow</strong> — How tasks are processed</summary>
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant R as Router
+    participant H as Hooks
+    participant A as Agent Pool
+    participant M as Memory
+    participant P as Provider
+
+    U->>R: Submit Task
+    R->>H: pre-task hook
+    H->>H: Analyze complexity
+
+    alt Simple Task
+        H->>A: Agent Booster (WASM)
+        A-->>U: Result (<1ms)
+    else Medium Task
+        H->>A: Spawn Haiku Agent
+        A->>M: Check patterns
+        M-->>A: Cached context
+        A->>P: LLM Call
+        P-->>A: Response
+        A->>H: post-task hook
+        H->>M: Store patterns
+        A-->>U: Result
+    else Complex Task
+        H->>A: Spawn Swarm
+        A->>A: Coordinate agents
+        A->>P: Multiple LLM calls
+        P-->>A: Responses
+        A->>H: post-task hook
+        A-->>U: Result
+    end
+```
+
+</details>
+
+<details>
+<summary>🧠 <strong>Memory Architecture</strong> — How knowledge is stored and retrieved</summary>
+
+```mermaid
+flowchart LR
+    subgraph Input["📥 Input"]
+        Query[Query/Pattern]
+    end
+
+    subgraph Processing["⚙️ Processing"]
+        Embed[ONNX Embeddings]
+        Normalize[Normalization]
+    end
+
+    subgraph Storage["💾 Storage"]
+        HNSW[(HNSW Index<br/>150x faster)]
+        SQLite[(SQLite Cache)]
+        AgentDB[(AgentDB)]
+    end
+
+    subgraph Retrieval["🔍 Retrieval"]
+        Vector[Vector Search]
+        Semantic[Semantic Match]
+        Results[Top-K Results]
+    end
+
+    Query --> Embed
+    Embed --> Normalize
+    Normalize --> HNSW
+    Normalize --> SQLite
+    HNSW --> Vector
+    SQLite --> Vector
+    AgentDB --> Semantic
+    Vector --> Results
+    Semantic --> Results
+```
+
+</details>
+
+<details>
+<summary>🐝 <strong>Swarm Topology</strong> — Multi-agent coordination patterns</summary>
+
+```mermaid
+flowchart TB
+    subgraph Hierarchical["👑 Hierarchical (Default)"]
+        Q1[Queen] --> W1[Worker 1]
+        Q1 --> W2[Worker 2]
+        Q1 --> W3[Worker 3]
+    end
+
+    subgraph Mesh["🕸️ Mesh"]
+        M1[Agent] <--> M2[Agent]
+        M2 <--> M3[Agent]
+        M3 <--> M1[Agent]
+    end
+
+    subgraph Ring["💍 Ring"]
+        R1[Agent] --> R2[Agent]
+        R2 --> R3[Agent]
+        R3 --> R1
+    end
+
+    subgraph Star["⭐ Star"]
+        S1[Hub] --> S2[Agent]
+        S1 --> S3[Agent]
+        S1 --> S4[Agent]
+    end
+```
+
+</details>
+
+<details>
+<summary>🔒 <strong>Security Layer</strong> — Threat detection and prevention</summary>
+
+```mermaid
+flowchart TB
+    subgraph Input["📥 Input Validation"]
+        Req[Request] --> Scan[AIDefence Scan]
+        Scan --> PII[PII Detection]
+        Scan --> Inject[Injection Check]
+        Scan --> Jailbreak[Jailbreak Detection]
+    end
+
+    subgraph Decision["⚖️ Decision"]
+        PII --> Risk{Risk Level}
+        Inject --> Risk
+        Jailbreak --> Risk
+    end
+
+    subgraph Action["🎬 Action"]
+        Risk -->|Safe| Allow[✅ Allow]
+        Risk -->|Warning| Sanitize[🧹 Sanitize]
+        Risk -->|Threat| Block[⛔ Block]
+    end
+
+    subgraph Learn["📚 Learning"]
+        Allow --> Log[Log Pattern]
+        Sanitize --> Log
+        Block --> Log
+        Log --> Update[Update Model]
+    end
+```
+
+</details>
+
 ---
 
 <details>
