@@ -1373,9 +1373,12 @@ Add to `.claude/settings.json`:
 - Git branch via `git branch --show-current`
 - GitHub user via `gh api user`
 
-### Background Daemons
+</details>
 
-#### V3 Node.js Worker Daemon (Recommended)
+<details>
+<summary>⚙️ <strong>Background Daemons</strong> — Auto-scheduled workers for continuous optimization</summary>
+
+**V3 Node.js Worker Daemon (Recommended)**
 
 Cross-platform TypeScript-based daemon service with auto-scheduling:
 
@@ -1471,6 +1474,7 @@ Shell-based daemons for monitoring (Linux/macOS only):
 .claude/helpers/worker-manager.sh status
 ```
 
+</details>
 </details>
 
 ---
