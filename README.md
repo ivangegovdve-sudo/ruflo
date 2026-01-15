@@ -946,7 +946,8 @@ npx claude-flow@v3alpha worker status
 | **Mistral** | Mistral Large 3 (675B MoE), Codestral | 92% GPT-5.2 performance at 15% cost | $0.50-8/1M tokens |
 | **Meta/Ollama** | Llama 4 Scout/Maverick, DeepSeek V3, Qwen 3 | Local, free, up to 10M context (Scout) | Free |
 
-### Provider Load Balancing
+<details>
+<summary>⚖️ <strong>Provider Load Balancing</strong> — 4 strategies for optimal cost and performance</summary>
 
 | Strategy | Description | Best For |
 |----------|-------------|----------|
@@ -955,7 +956,10 @@ npx claude-flow@v3alpha worker status
 | `latency-based` | Use fastest responding provider | Low latency |
 | `cost-based` | Use cheapest provider that meets requirements | Cost optimization (85%+ savings) |
 
-### Embedding Providers (`@claude-flow/embeddings`)
+</details>
+
+<details>
+<summary>🔢 <strong>Embedding Providers</strong> — 4 providers from 3ms local to cloud APIs</summary>
 
 | Provider | Models | Dimensions | Latency | Cost |
 |----------|--------|------------|---------|------|
@@ -963,8 +967,6 @@ npx claude-flow@v3alpha worker status
 | **OpenAI** | text-embedding-3-small/large, ada-002 | 1536-3072 | ~50-100ms | $0.02-0.13/1M tokens |
 | **Transformers.js** | all-MiniLM-L6-v2, all-mpnet-base-v2, bge-small | 384-768 | ~230ms | Free (local) |
 | **Mock** | Deterministic hash-based | Configurable | <1ms | Free |
-
-### Embedding Features
 
 | Feature | Description | Performance |
 |---------|-------------|-------------|
@@ -975,7 +977,12 @@ npx claude-flow@v3alpha worker status
 | **Batch Processing** | Efficient batch embedding with partial cache | 10 items <100ms |
 | **Similarity Functions** | Cosine, Euclidean, Dot product | Optimized math |
 
-### Consensus Strategies (`@claude-flow/swarm`)
+</details>
+
+</details>
+
+<details>
+<summary>🤝 <strong>Consensus Strategies</strong> — 5 distributed agreement protocols</summary>
 
 | Strategy | Algorithm | Fault Tolerance | Latency | Best For |
 |----------|-----------|-----------------|---------|----------|
