@@ -990,7 +990,10 @@ npx claude-flow@v3alpha worker status
 | **CRDT** | Conflict-free Replicated Data Types | Strong eventual consistency | ~10ms | Concurrent updates |
 | **Quorum** | Configurable read/write quorums | Flexible | ~75ms | Tunable consistency |
 
-### CLI Commands (`@claude-flow/cli`)
+</details>
+
+<details>
+<summary>💻 <strong>CLI Commands</strong> — 26 commands with 140+ subcommands</summary>
 
 | Command | Subcommands | Description |
 |---------|-------------|-------------|
