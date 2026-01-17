@@ -726,7 +726,7 @@ export const setupCommand: Command = {
         if (files.length > 0) {
           output.printWarning(`Directory ${outputDir} already exists and is not empty.`);
           output.printInfo('Use --force to overwrite existing files.');
-          return { success: false, error: 'Directory not empty' };
+          return { success: false, message: 'Directory not empty' };
         }
       }
 
