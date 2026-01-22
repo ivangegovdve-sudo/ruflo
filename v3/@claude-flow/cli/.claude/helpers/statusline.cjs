@@ -3,7 +3,20 @@
  * Claude Flow V3 Statusline Generator
  * Displays real-time V3 implementation progress and system status
  *
- * Usage: node statusline.cjs [--json] [--compact]
+ * Usage: node statusline.cjs [options]
+ *
+ * Options:
+ *   (default)   Safe multi-line output with collision zone avoidance
+ *   --single    Single-line output (completely avoids collision)
+ *   --unsafe    Legacy multi-line without collision avoidance
+ *   --legacy    Alias for --unsafe
+ *   --json      JSON output with pretty printing
+ *   --compact   JSON output without formatting
+ *
+ * Collision Zone Fix (Issue #985):
+ * Claude Code writes its internal status (e.g., "7s • 1p") at absolute
+ * terminal coordinates (columns 15-25 on second-to-last line). The safe
+ * mode pads the collision line with spaces to push content past column 25.
  *
  * IMPORTANT: This file uses .cjs extension to work in ES module projects.
  * The require() syntax is intentional for CommonJS compatibility.
@@ -26,6 +39,10 @@ const CONFIG = {
   maxAgents: 15,
   topology: 'hierarchical-mesh',
 };
+
+// Cross-platform helpers
+const isWindows = process.platform === 'win32';
+const nullDevice = isWindows ? 'NUL' : '/dev/null';
 
 // ANSI colors
 const c = {
@@ -54,8 +71,15 @@ function getUserInfo() {
   let modelName = 'Unknown';
 
   try {
-    name = execSync('git config user.name 2>/dev/null || echo "user"', { encoding: 'utf-8' }).trim();
-    gitBranch = execSync('git branch --show-current 2>/dev/null || echo ""', { encoding: 'utf-8' }).trim();
+    const gitUserCmd = isWindows
+      ? 'git config user.name 2>NUL || echo user'
+      : 'git config user.name 2>/dev/null || echo "user"';
+    const gitBranchCmd = isWindows
+      ? 'git branch --show-current 2>NUL || echo.'
+      : 'git branch --show-current 2>/dev/null || echo ""';
+    name = execSync(gitUserCmd, { encoding: 'utf-8' }).trim();
+    gitBranch = execSync(gitBranchCmd, { encoding: 'utf-8' }).trim();
+    if (gitBranch === '.') gitBranch = ''; // Windows echo. outputs a dot
   } catch (e) {
     // Ignore errors
   }
@@ -81,23 +105,21 @@ function getUserInfo() {
       if (lastModelUsage) {
         const modelIds = Object.keys(lastModelUsage);
         if (modelIds.length > 0) {
-          // Find the most recently used model by checking lastUsedAt timestamps
-          // or fall back to the last key in the object (preserves insertion order in modern JS)
+          // Take the last model (most recently added to the object)
+          // Or find the one with most tokens (most actively used this session)
           let modelId = modelIds[modelIds.length - 1];
-          let latestTimestamp = 0;
-
-          for (const id of modelIds) {
-            const usage = lastModelUsage[id];
-            // Check for lastUsedAt timestamp (if available)
-            if (usage.lastUsedAt) {
-              const ts = new Date(usage.lastUsedAt).getTime();
-              if (ts > latestTimestamp) {
-                latestTimestamp = ts;
+          if (modelIds.length > 1) {
+            // If multiple models, pick the one with most total tokens
+            let maxTokens = 0;
+            for (const id of modelIds) {
+              const usage = lastModelUsage[id];
+              const total = (usage.inputTokens || 0) + (usage.outputTokens || 0);
+              if (total > maxTokens) {
+                maxTokens = total;
                 modelId = id;
               }
             }
           }
-
           // Parse model ID to human-readable name
           if (modelId.includes('opus')) modelName = 'Opus 4.5';
           else if (modelId.includes('sonnet')) modelName = 'Sonnet 4';
@@ -161,25 +183,6 @@ function getLearningStats() {
 function getV3Progress() {
   const learning = getLearningStats();
 
-  // Check for metrics file first (created by init)
-  const metricsPath = path.join(process.cwd(), '.claude-flow', 'metrics', 'v3-progress.json');
-  if (fs.existsSync(metricsPath)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(metricsPath, 'utf-8'));
-      if (data.domains && data.ddd) {
-        return {
-          domainsCompleted: data.domains.completed || 0,
-          totalDomains: data.domains.total || 5,
-          dddProgress: data.ddd.progress || 0,
-          patternsLearned: data.learning?.patternsLearned || learning.patterns,
-          sessionsCompleted: data.learning?.sessionsCompleted || learning.sessions
-        };
-      }
-    } catch (e) {
-      // Fall through to pattern-based calculation
-    }
-  }
-
   // DDD progress based on actual learned patterns
   // New install: 0 patterns = 0/5 domains, 0% DDD
   // As patterns grow: 10+ patterns = 1 domain, 50+ = 2, 100+ = 3, 200+ = 4, 500+ = 5
@@ -204,26 +207,11 @@ function getV3Progress() {
 
 // Get security status based on actual scans
 function getSecurityStatus() {
-  const totalCves = 3;
-  let cvesFixed = 0;
-
-  // Check audit-status.json first (created by init)
-  const auditStatusPath = path.join(process.cwd(), '.claude-flow', 'security', 'audit-status.json');
-  if (fs.existsSync(auditStatusPath)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(auditStatusPath, 'utf-8'));
-      return {
-        status: data.status || 'PENDING',
-        cvesFixed: data.cvesFixed || 0,
-        totalCves: data.totalCves || 3,
-      };
-    } catch (e) {
-      // Fall through to scan directory check
-    }
-  }
-
   // Check for security scan results in memory
   const scanResultsPath = path.join(process.cwd(), '.claude', 'security-scans');
+  let cvesFixed = 0;
+  const totalCves = 3;
+
   if (fs.existsSync(scanResultsPath)) {
     try {
       const scans = fs.readdirSync(scanResultsPath).filter(f => f.endsWith('.json'));
@@ -235,10 +223,10 @@ function getSecurityStatus() {
   }
 
   // Also check .swarm/security for audit results
-  const swarmAuditPath = path.join(process.cwd(), '.swarm', 'security');
-  if (fs.existsSync(swarmAuditPath)) {
+  const auditPath = path.join(process.cwd(), '.swarm', 'security');
+  if (fs.existsSync(auditPath)) {
     try {
-      const audits = fs.readdirSync(swarmAuditPath).filter(f => f.includes('audit'));
+      const audits = fs.readdirSync(auditPath).filter(f => f.includes('audit'));
       cvesFixed = Math.min(totalCves, Math.max(cvesFixed, audits.length));
     } catch (e) {
       // Ignore
@@ -254,45 +242,23 @@ function getSecurityStatus() {
   };
 }
 
-// Get swarm status (cross-platform)
+// Get swarm status
 function getSwarmStatus() {
   let activeAgents = 0;
   let coordinationActive = false;
 
-  // Check swarm-activity.json first (works on all platforms)
-  const activityPath = path.join(process.cwd(), '.claude-flow', 'metrics', 'swarm-activity.json');
-  if (fs.existsSync(activityPath)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(activityPath, 'utf-8'));
-      if (data.swarm) {
-        return {
-          activeAgents: data.swarm.agent_count || 0,
-          maxAgents: CONFIG.maxAgents,
-          coordinationActive: data.swarm.coordination_active || false,
-        };
-      }
-    } catch (e) {
-      // Fall through to process detection
-    }
-  }
-
-  // Platform-specific process detection
-  const isWindows = process.platform === 'win32';
   try {
     if (isWindows) {
-      // Windows: use tasklist
-      const ps = execSync('tasklist /FI "IMAGENAME eq node.exe" /NH 2>nul || echo ""', { encoding: 'utf-8' });
-      const nodeProcesses = (ps.match(/node\.exe/gi) || []).length;
-      activeAgents = Math.max(0, Math.floor(nodeProcesses / 3)); // Heuristic
-      coordinationActive = nodeProcesses > 0;
+      // Windows: use tasklist and findstr
+      const ps = execSync('tasklist 2>NUL | findstr /I "agentic-flow" 2>NUL | find /C /V "" 2>NUL || echo 0', { encoding: 'utf-8' });
+      activeAgents = Math.max(0, parseInt(ps.trim()) || 0);
     } else {
-      // Unix: use ps
       const ps = execSync('ps aux 2>/dev/null | grep -c agentic-flow || echo "0"', { encoding: 'utf-8' });
       activeAgents = Math.max(0, parseInt(ps.trim()) - 1);
-      coordinationActive = activeAgents > 0;
     }
+    coordinationActive = activeAgents > 0;
   } catch (e) {
-    // Ignore errors - return defaults
+    // Ignore errors - default to 0 agents
   }
 
   return {
@@ -302,46 +268,22 @@ function getSwarmStatus() {
   };
 }
 
-// Get system metrics (cross-platform)
+// Get system metrics (dynamic based on actual state)
 function getSystemMetrics() {
   let memoryMB = 0;
   let subAgents = 0;
 
-  // Check learning.json first (works on all platforms)
-  const learningMetricsPath = path.join(process.cwd(), '.claude-flow', 'metrics', 'learning.json');
-  let intelligenceFromFile = null;
-  let contextFromFile = null;
-  if (fs.existsSync(learningMetricsPath)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(learningMetricsPath, 'utf-8'));
-      if (data.routing?.accuracy !== undefined) {
-        intelligenceFromFile = Math.min(100, Math.floor(data.routing.accuracy));
-      }
-      if (data.sessions?.total !== undefined) {
-        contextFromFile = Math.min(100, data.sessions.total * 5);
-      }
-    } catch (e) {
-      // Fall through
-    }
-  }
-
-  // Platform-specific memory detection
-  const isWindows = process.platform === 'win32';
   try {
     if (isWindows) {
-      // Windows: use process.memoryUsage() (most reliable cross-platform)
+      // Windows: use tasklist for memory info, fallback to process.memoryUsage
+      // tasklist memory column is complex to parse, use Node.js API instead
       memoryMB = Math.floor(process.memoryUsage().heapUsed / 1024 / 1024);
     } else {
-      // Unix: try ps command, fallback to process.memoryUsage()
-      try {
-        const mem = execSync('ps aux | grep -E "(node|agentic|claude)" | grep -v grep | awk \'{sum += \$6} END {print int(sum/1024)}\'', { encoding: 'utf-8' });
-        memoryMB = parseInt(mem.trim()) || 0;
-      } catch (e) {
-        memoryMB = Math.floor(process.memoryUsage().heapUsed / 1024 / 1024);
-      }
+      const mem = execSync('ps aux | grep -E "(node|agentic|claude)" | grep -v grep | awk \'{sum += $6} END {print int(sum/1024)}\'', { encoding: 'utf-8' });
+      memoryMB = parseInt(mem.trim()) || 0;
     }
   } catch (e) {
-    // Fallback to Node.js memory API
+    // Fallback
     memoryMB = Math.floor(process.memoryUsage().heapUsed / 1024 / 1024);
   }
 
@@ -349,34 +291,23 @@ function getSystemMetrics() {
   const learning = getLearningStats();
 
   // Intelligence % based on learned patterns (0 patterns = 0%, 1000+ = 100%)
-  const intelligencePct = intelligenceFromFile !== null
-    ? intelligenceFromFile
-    : Math.min(100, Math.floor((learning.patterns / 10) * 1));
+  const intelligencePct = Math.min(100, Math.floor((learning.patterns / 10) * 1));
 
   // Context % based on session history (0 sessions = 0%, grows with usage)
-  const contextPct = contextFromFile !== null
-    ? contextFromFile
-    : Math.min(100, Math.floor(learning.sessions * 5));
+  const contextPct = Math.min(100, Math.floor(learning.sessions * 5));
 
-  // Count active sub-agents (cross-platform via metrics file)
-  const activityPath = path.join(process.cwd(), '.claude-flow', 'metrics', 'swarm-activity.json');
-  if (fs.existsSync(activityPath)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(activityPath, 'utf-8'));
-      subAgents = data.processes?.estimated_agents || 0;
-    } catch (e) {
-      // Ignore
-    }
-  }
-
-  // Fallback to process detection on Unix only
-  if (subAgents === 0 && !isWindows) {
-    try {
+  // Count active sub-agents from process list
+  try {
+    if (isWindows) {
+      // Windows: use tasklist and findstr for agent counting
+      const agents = execSync('tasklist 2>NUL | findstr /I "claude-flow" 2>NUL | find /C /V "" 2>NUL || echo 0', { encoding: 'utf-8' });
+      subAgents = Math.max(0, parseInt(agents.trim()) || 0);
+    } else {
       const agents = execSync('ps aux 2>/dev/null | grep -c "claude-flow.*agent" || echo "0"', { encoding: 'utf-8' });
       subAgents = Math.max(0, parseInt(agents.trim()) - 1);
-    } catch (e) {
-      // Ignore
     }
+  } catch (e) {
+    // Ignore - default to 0
   }
 
   return {
@@ -385,224 +316,6 @@ function getSystemMetrics() {
     intelligencePct,
     subAgents,
   };
-}
-
-// Get ADR (Architecture Decision Records) status
-function getADRStatus() {
-  const adrPaths = [
-    path.join(process.cwd(), 'docs', 'adrs'),
-    path.join(process.cwd(), 'docs', 'adr'),
-    path.join(process.cwd(), 'adr'),
-    path.join(process.cwd(), 'ADR'),
-    path.join(process.cwd(), '.claude-flow', 'adrs'),
-    path.join(process.cwd(), 'v3', 'implementation', 'adrs'),
-    path.join(process.cwd(), 'implementation', 'adrs'),
-  ];
-
-  let count = 0;
-  let implemented = 0;
-
-  for (const adrPath of adrPaths) {
-    if (fs.existsSync(adrPath)) {
-      try {
-        const files = fs.readdirSync(adrPath).filter(f =>
-          f.endsWith('.md') && (f.startsWith('ADR-') || f.startsWith('adr-') || /^\d{4}-/.test(f))
-        );
-        count = files.length;
-
-        // Check for implemented status in ADR files
-        for (const file of files) {
-          try {
-            const content = fs.readFileSync(path.join(adrPath, file), 'utf-8');
-            if (content.includes('Status: Implemented') || content.includes('status: implemented') ||
-                content.includes('Status: Accepted') || content.includes('status: accepted')) {
-              implemented++;
-            }
-          } catch (e) {
-            // Skip unreadable files
-          }
-        }
-        break;
-      } catch (e) {
-        // Ignore
-      }
-    }
-  }
-
-  return { count, implemented };
-}
-
-// Get hooks status (enabled/registered hooks)
-function getHooksStatus() {
-  let enabled = 0;
-  let total = 17; // V3 has 17 hook types
-
-  // Check .claude/settings.json for hooks config
-  const settingsPaths = [
-    path.join(process.cwd(), '.claude', 'settings.json'),
-    path.join(process.cwd(), '.claude', 'settings.local.json'),
-  ];
-
-  for (const settingsPath of settingsPaths) {
-    if (fs.existsSync(settingsPath)) {
-      try {
-        const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-        if (settings.hooks) {
-          // Claude Code native hooks format: PreToolUse, PostToolUse, SessionStart, etc.
-          const hookCategories = Object.keys(settings.hooks);
-          for (const category of hookCategories) {
-            const categoryHooks = settings.hooks[category];
-            if (Array.isArray(categoryHooks) && categoryHooks.length > 0) {
-              // Count categories with at least one hook defined
-              enabled++;
-            }
-          }
-        }
-        break;
-      } catch (e) {
-        // Ignore parse errors
-      }
-    }
-  }
-
-  // Also check for hook files in .claude/hooks
-  const hooksDir = path.join(process.cwd(), '.claude', 'hooks');
-  if (fs.existsSync(hooksDir)) {
-    try {
-      const hookFiles = fs.readdirSync(hooksDir).filter(f => f.endsWith('.js') || f.endsWith('.sh'));
-      enabled = Math.max(enabled, hookFiles.length);
-    } catch (e) {
-      // Ignore
-    }
-  }
-
-  return { enabled, total };
-}
-
-// Get AgentDB memory stats
-function getAgentDBStats() {
-  let vectorCount = 0;
-  let dbSizeKB = 0;
-  let namespaces = 0;
-
-  const dbPaths = [
-    path.join(process.cwd(), '.claude-flow', 'agentdb'),
-    path.join(process.cwd(), '.swarm', 'agentdb'),
-    path.join(process.cwd(), 'data', 'agentdb'),
-    path.join(process.cwd(), '.claude', 'memory'),
-  ];
-
-  for (const dbPath of dbPaths) {
-    if (fs.existsSync(dbPath)) {
-      try {
-        const stats = fs.statSync(dbPath);
-        if (stats.isDirectory()) {
-          // Count database files and estimate vectors
-          const files = fs.readdirSync(dbPath);
-          namespaces = files.filter(f => f.endsWith('.db') || f.endsWith('.sqlite')).length;
-
-          // Calculate total size
-          for (const file of files) {
-            const filePath = path.join(dbPath, file);
-            const fileStat = fs.statSync(filePath);
-            if (fileStat.isFile()) {
-              dbSizeKB += fileStat.size / 1024;
-            }
-          }
-
-          // Estimate vector count (~0.5KB per vector on average)
-          vectorCount = Math.floor(dbSizeKB / 0.5);
-        } else {
-          // Single file database
-          dbSizeKB = stats.size / 1024;
-          vectorCount = Math.floor(dbSizeKB / 0.5);
-          namespaces = 1;
-        }
-        break;
-      } catch (e) {
-        // Ignore
-      }
-    }
-  }
-
-  // Also check for vectors.json (simple vector store)
-  const vectorsPath = path.join(process.cwd(), '.claude-flow', 'vectors.json');
-  if (fs.existsSync(vectorsPath) && vectorCount === 0) {
-    try {
-      const data = JSON.parse(fs.readFileSync(vectorsPath, 'utf-8'));
-      if (Array.isArray(data)) {
-        vectorCount = data.length;
-      } else if (data.vectors) {
-        vectorCount = Object.keys(data.vectors).length;
-      }
-    } catch (e) {
-      // Ignore
-    }
-  }
-
-  return { vectorCount, dbSizeKB: Math.floor(dbSizeKB), namespaces };
-}
-
-// Get test statistics
-function getTestStats() {
-  let testFiles = 0;
-  let testCases = 0;
-
-  const testDirs = [
-    path.join(process.cwd(), 'tests'),
-    path.join(process.cwd(), 'test'),
-    path.join(process.cwd(), '__tests__'),
-    path.join(process.cwd(), 'src', '__tests__'),
-    path.join(process.cwd(), 'v3', '__tests__'),
-  ];
-
-  // Recursively count test files
-  function countTestFiles(dir, depth = 0) {
-    if (depth > 3) return; // Limit recursion
-    if (!fs.existsSync(dir)) return;
-
-    try {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
-          countTestFiles(path.join(dir, entry.name), depth + 1);
-        } else if (entry.isFile()) {
-          const name = entry.name;
-          if (name.includes('.test.') || name.includes('.spec.') ||
-              name.includes('_test.') || name.includes('_spec.') ||
-              name.startsWith('test_') || name.startsWith('spec_')) {
-            testFiles++;
-
-            // Try to estimate test cases from file
-            try {
-              const content = fs.readFileSync(path.join(dir, name), 'utf-8');
-              // Count it(), test(), describe() patterns
-              const itMatches = (content.match(/\bit\s*\(/g) || []).length;
-              const testMatches = (content.match(/\btest\s*\(/g) || []).length;
-              testCases += itMatches + testMatches;
-            } catch (e) {
-              // Estimate 3 tests per file if can't read
-              testCases += 3;
-            }
-          }
-        }
-      }
-    } catch (e) {
-      // Ignore
-    }
-  }
-
-  for (const dir of testDirs) {
-    countTestFiles(dir);
-  }
-
-  // Also check src directory for colocated tests
-  const srcDir = path.join(process.cwd(), 'src');
-  if (fs.existsSync(srcDir)) {
-    countTestFiles(srcDir);
-  }
-
-  return { testFiles, testCases };
 }
 
 // Generate progress bar
@@ -620,10 +333,6 @@ function generateStatusline() {
   const security = getSecurityStatus();
   const swarm = getSwarmStatus();
   const system = getSystemMetrics();
-  const adrs = getADRStatus();
-  const hooks = getHooksStatus();
-  const agentdb = getAgentDBStats();
-  const tests = getTestStats();
   const lines = [];
 
   // Header Line
@@ -646,41 +355,28 @@ function generateStatusline() {
     `${c.brightYellow}⚡ 1.0x${c.reset} ${c.dim}→${c.reset} ${c.brightYellow}2.49x-7.47x${c.reset}`
   );
 
-  // Line 2: Swarm + Hooks + CVE + Memory + Context + Intelligence
+  // Line 2: Swarm + CVE + Memory + Context + Intelligence
   const swarmIndicator = swarm.coordinationActive ? `${c.brightGreen}◉${c.reset}` : `${c.dim}○${c.reset}`;
   const agentsColor = swarm.activeAgents > 0 ? c.brightGreen : c.red;
   let securityIcon = security.status === 'CLEAN' ? '🟢' : security.status === 'IN_PROGRESS' ? '🟡' : '🔴';
   let securityColor = security.status === 'CLEAN' ? c.brightGreen : security.status === 'IN_PROGRESS' ? c.brightYellow : c.brightRed;
-  const hooksColor = hooks.enabled > 0 ? c.brightGreen : c.dim;
 
   lines.push(
     `${c.brightYellow}🤖 Swarm${c.reset}  ${swarmIndicator} [${agentsColor}${String(swarm.activeAgents).padStart(2)}${c.reset}/${c.brightWhite}${swarm.maxAgents}${c.reset}]  ` +
     `${c.brightPurple}👥 ${system.subAgents}${c.reset}    ` +
-    `${c.brightBlue}🪝 ${hooksColor}${hooks.enabled}${c.reset}/${c.brightWhite}${hooks.total}${c.reset}    ` +
     `${securityIcon} ${securityColor}CVE ${security.cvesFixed}${c.reset}/${c.brightWhite}${security.totalCves}${c.reset}    ` +
     `${c.brightCyan}💾 ${system.memoryMB}MB${c.reset}    ` +
+    `${c.brightGreen}📂 ${String(system.contextPct).padStart(3)}%${c.reset}    ` +
     `${c.dim}🧠 ${String(system.intelligencePct).padStart(3)}%${c.reset}`
   );
 
-  // Line 3: Architecture status with ADRs, AgentDB, Tests
+  // Line 3: Architecture status
   const dddColor = progress.dddProgress >= 50 ? c.brightGreen : progress.dddProgress > 0 ? c.yellow : c.red;
-  const adrColor = adrs.count > 0 ? (adrs.implemented === adrs.count ? c.brightGreen : c.yellow) : c.dim;
-  const vectorColor = agentdb.vectorCount > 0 ? c.brightGreen : c.dim;
-  const testColor = tests.testFiles > 0 ? c.brightGreen : c.dim;
-
   lines.push(
     `${c.brightPurple}🔧 Architecture${c.reset}    ` +
-    `${c.cyan}ADRs${c.reset} ${adrColor}●${adrs.implemented}/${adrs.count}${c.reset}  ${c.dim}│${c.reset}  ` +
     `${c.cyan}DDD${c.reset} ${dddColor}●${String(progress.dddProgress).padStart(3)}%${c.reset}  ${c.dim}│${c.reset}  ` +
-    `${c.cyan}Security${c.reset} ${securityColor}●${security.status}${c.reset}`
-  );
-
-  // Line 4: Memory, Vectors, Tests
-  lines.push(
-    `${c.brightCyan}📊 AgentDB${c.reset}    ` +
-    `${c.cyan}Vectors${c.reset} ${vectorColor}●${agentdb.vectorCount}${c.reset}  ${c.dim}│${c.reset}  ` +
-    `${c.cyan}Size${c.reset} ${c.brightWhite}${agentdb.dbSizeKB}KB${c.reset}  ${c.dim}│${c.reset}  ` +
-    `${c.cyan}Tests${c.reset} ${testColor}●${tests.testFiles}${c.reset} ${c.dim}(${tests.testCases} cases)${c.reset}  ${c.dim}│${c.reset}  ` +
+    `${c.cyan}Security${c.reset} ${securityColor}●${security.status}${c.reset}  ${c.dim}│${c.reset}  ` +
+    `${c.cyan}Memory${c.reset} ${c.brightGreen}●AgentDB${c.reset}  ${c.dim}│${c.reset}  ` +
     `${c.cyan}Integration${c.reset} ${swarm.coordinationActive ? c.brightCyan : c.dim}●${c.reset}`
   );
 
@@ -695,10 +391,6 @@ function generateJSON() {
     security: getSecurityStatus(),
     swarm: getSwarmStatus(),
     system: getSystemMetrics(),
-    adrs: getADRStatus(),
-    hooks: getHooksStatus(),
-    agentdb: getAgentDBStats(),
-    tests: getTestStats(),
     performance: {
       flashAttentionTarget: '2.49x-7.47x',
       searchImprovement: '150x-12,500x',
@@ -708,11 +400,110 @@ function generateJSON() {
   };
 }
 
+/**
+ * Generate single-line output for Claude Code compatibility
+ * This avoids the collision zone issue entirely by using one line
+ * @see https://github.com/ruvnet/claude-flow/issues/985
+ */
+function generateSingleLine() {
+  if (!CONFIG.enabled) return '';
+
+  const user = getUserInfo();
+  const progress = getV3Progress();
+  const security = getSecurityStatus();
+  const swarm = getSwarmStatus();
+  const system = getSystemMetrics();
+
+  const swarmIndicator = swarm.coordinationActive ? '●' : '○';
+  const securityStatus = security.status === 'CLEAN' ? '✓' :
+                         security.cvesFixed > 0 ? '~' : '✗';
+
+  return `${c.brightPurple}CF-V3${c.reset} ${c.dim}|${c.reset} ` +
+    `${c.cyan}D:${progress.domainsCompleted}/${progress.totalDomains}${c.reset} ${c.dim}|${c.reset} ` +
+    `${c.yellow}S:${swarmIndicator}${swarm.activeAgents}/${swarm.maxAgents}${c.reset} ${c.dim}|${c.reset} ` +
+    `${security.status === 'CLEAN' ? c.green : c.red}CVE:${securityStatus}${security.cvesFixed}/${security.totalCves}${c.reset} ${c.dim}|${c.reset} ` +
+    `${c.dim}🧠${system.intelligencePct}%${c.reset}`;
+}
+
+/**
+ * Generate safe multi-line statusline that avoids Claude Code collision zone
+ * The collision zone is columns 15-25 on the second-to-last line.
+ * We pad that line with spaces to push content past column 25.
+ * @see https://github.com/ruvnet/claude-flow/issues/985
+ */
+function generateSafeStatusline() {
+  if (!CONFIG.enabled) return '';
+
+  const user = getUserInfo();
+  const progress = getV3Progress();
+  const security = getSecurityStatus();
+  const swarm = getSwarmStatus();
+  const system = getSystemMetrics();
+  const lines = [];
+
+  // Header Line
+  let header = `${c.bold}${c.brightPurple}▊ Claude Flow V3 ${c.reset}`;
+  header += `${swarm.coordinationActive ? c.brightCyan : c.dim}● ${c.brightCyan}${user.name}${c.reset}`;
+  if (user.gitBranch) {
+    header += `  ${c.dim}│${c.reset}  ${c.brightBlue}⎇ ${user.gitBranch}${c.reset}`;
+  }
+  header += `  ${c.dim}│${c.reset}  ${c.purple}${user.modelName}${c.reset}`;
+  lines.push(header);
+
+  // Separator
+  lines.push(`${c.dim}─────────────────────────────────────────────────────${c.reset}`);
+
+  // Line 1: DDD Domain Progress
+  const domainsColor = progress.domainsCompleted >= 3 ? c.brightGreen : progress.domainsCompleted > 0 ? c.yellow : c.red;
+  lines.push(
+    `${c.brightCyan}🏗️  DDD Domains${c.reset}    ${progressBar(progress.domainsCompleted, progress.totalDomains)}  ` +
+    `${domainsColor}${progress.domainsCompleted}${c.reset}/${c.brightWhite}${progress.totalDomains}${c.reset}    ` +
+    `${c.brightYellow}⚡ 1.0x${c.reset} ${c.dim}→${c.reset} ${c.brightYellow}2.49x-7.47x${c.reset}`
+  );
+
+  // Line 2 (COLLISION LINE): Swarm status with 24 spaces padding after emoji
+  // The emoji (🤖) is 2 columns. 24 spaces pushes content to column 26, past the collision zone (15-25)
+  const swarmIndicator = swarm.coordinationActive ? `${c.brightGreen}◉${c.reset}` : `${c.dim}○${c.reset}`;
+  const agentsColor = swarm.activeAgents > 0 ? c.brightGreen : c.red;
+  let securityIcon = security.status === 'CLEAN' ? '🟢' : security.status === 'IN_PROGRESS' ? '🟡' : '🔴';
+  let securityColor = security.status === 'CLEAN' ? c.brightGreen : security.status === 'IN_PROGRESS' ? c.brightYellow : c.brightRed;
+
+  // CRITICAL: 24 spaces after 🤖 (emoji is 2 cols, so 2+24=26, past collision zone cols 15-25)
+  lines.push(
+    `${c.brightYellow}🤖${c.reset}                        ` +  // 24 spaces padding
+    `${swarmIndicator} [${agentsColor}${String(swarm.activeAgents).padStart(2)}${c.reset}/${c.brightWhite}${swarm.maxAgents}${c.reset}]  ` +
+    `${c.brightPurple}👥 ${system.subAgents}${c.reset}  ` +
+    `${securityIcon} ${securityColor}CVE ${security.cvesFixed}${c.reset}/${c.brightWhite}${security.totalCves}${c.reset}  ` +
+    `${c.brightCyan}💾 ${system.memoryMB}MB${c.reset}  ` +
+    `${c.dim}🧠 ${system.intelligencePct}%${c.reset}`
+  );
+
+  // Line 3: Architecture status (this is the last line, not in collision zone)
+  const dddColor = progress.dddProgress >= 50 ? c.brightGreen : progress.dddProgress > 0 ? c.yellow : c.red;
+  lines.push(
+    `${c.brightPurple}🔧 Architecture${c.reset}    ` +
+    `${c.cyan}DDD${c.reset} ${dddColor}●${String(progress.dddProgress).padStart(3)}%${c.reset}  ${c.dim}│${c.reset}  ` +
+    `${c.cyan}Security${c.reset} ${securityColor}●${security.status}${c.reset}  ${c.dim}│${c.reset}  ` +
+    `${c.cyan}Memory${c.reset} ${c.brightGreen}●AgentDB${c.reset}  ${c.dim}│${c.reset}  ` +
+    `${c.cyan}Integration${c.reset} ${swarm.coordinationActive ? c.brightCyan : c.dim}●${c.reset}`
+  );
+
+  return lines.join('\n');
+}
+
 // Main
 if (process.argv.includes('--json')) {
   console.log(JSON.stringify(generateJSON(), null, 2));
 } else if (process.argv.includes('--compact')) {
   console.log(JSON.stringify(generateJSON()));
-} else {
+} else if (process.argv.includes('--single')) {
+  // Single-line mode - completely avoids collision zone
+  console.log(generateSingleLine());
+} else if (process.argv.includes('--unsafe') || process.argv.includes('--legacy')) {
+  // Legacy mode - original multi-line without collision avoidance
   console.log(generateStatusline());
+} else {
+  // Default: Safe multi-line mode with collision zone avoidance
+  // Use --unsafe or --legacy to get the original behavior
+  console.log(generateSafeStatusline());
 }
