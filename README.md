@@ -404,7 +404,7 @@ swarm_init({
 
 ### Prerequisites
 
-- **Node.js 18+** or **Bun 1.0+** (Bun is faster)
+- **Node.js 20+** (required)
 - **npm 9+** / **pnpm** / **bun** package manager
 
 **IMPORTANT**: Claude Code must be installed first:
@@ -419,23 +419,56 @@ claude --dangerously-skip-permissions
 
 ### Installation
 
+#### One-Line Install (Recommended)
+
 ```bash
-# With npm/npx (Node.js)
-npm install claude-flow@v3alpha
-npx claude-flow@v3alpha init
+# curl-style installer with progress display
+curl -fsSL https://raw.githubusercontent.com/ruvnet/claude-flow/main/scripts/install.sh | bash
+
+# Or with options:
+CLAUDE_FLOW_GLOBAL=1 curl -fsSL https://raw.githubusercontent.com/ruvnet/claude-flow/main/scripts/install.sh | bash
+```
+
+#### npm/npx Install
+
+```bash
+# Quick start (no install needed)
+npx claude-flow@alpha init
+
+# Or install globally
+npm install -g claude-flow@alpha
+claude-flow init
 
 # With Bun (faster)
-bun add claude-flow@v3alpha
-bunx claude-flow@v3alpha init
+bunx claude-flow@alpha init
+```
+
+#### Install Profiles
+
+| Profile | Size | Use Case |
+|---------|------|----------|
+| `--omit=optional` | ~340MB | Core features only |
+| Default | ~340MB | Standard install |
+
+```bash
+# Minimal install (skip ML/embeddings)
+npm install -g claude-flow@alpha --omit=optional
+```
+
+### Basic Usage
+
+```bash
+# Initialize project
+npx claude-flow@alpha init
 
 # Start MCP server for Claude Code integration
-npx claude-flow@v3alpha mcp start
+npx claude-flow@alpha mcp start
 
 # Run a task with agents
-npx claude-flow@v3alpha --agent coder --task "Implement user authentication"
+npx claude-flow@alpha --agent coder --task "Implement user authentication"
 
 # List available agents
-npx claude-flow@v3alpha --list
+npx claude-flow@alpha --list
 ```
 
 ### Upgrading
