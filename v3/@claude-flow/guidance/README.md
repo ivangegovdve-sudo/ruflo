@@ -908,13 +908,13 @@ npm run test:coverage   # with coverage
 | [G014](docs/adrs/ADR-G014-conformance-kit.md) | Agent Cell Conformance Kit | Accepted |
 | [G015](docs/adrs/ADR-G015-coherence-driven-throttling.md) | Coherence-Driven Throttling | Accepted |
 | [G016](docs/adrs/ADR-G016-agentic-container-integration.md) | Agentic Container Integration | Accepted |
-| G017 | Trust Score Accumulation | Proposed |
-| G018 | Truth Anchor System | Proposed |
-| G019 | First-Class Uncertainty | Proposed |
-| G020 | Temporal Assertions | Proposed |
-| G021 | Human Authority and Irreversibility | Proposed |
-| G022 | Adversarial Model | Proposed |
-| G023 | Meta-Governance | Proposed |
+| [G017](docs/adrs/ADR-G017-trust-score-accumulation.md) | Trust Score Accumulation | Accepted |
+| [G018](docs/adrs/ADR-G018-truth-anchor-system.md) | Truth Anchor System | Accepted |
+| [G019](docs/adrs/ADR-G019-first-class-uncertainty.md) | First-Class Uncertainty | Accepted |
+| [G020](docs/adrs/ADR-G020-temporal-assertions.md) | Temporal Assertions | Accepted |
+| [G021](docs/adrs/ADR-G021-human-authority-and-irreversibility.md) | Human Authority and Irreversibility | Accepted |
+| [G022](docs/adrs/ADR-G022-adversarial-model.md) | Adversarial Model | Accepted |
+| [G023](docs/adrs/ADR-G023-meta-governance.md) | Meta-Governance | Accepted |
 
 ## Measurement Plan
 
