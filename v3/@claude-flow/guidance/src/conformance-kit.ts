@@ -994,6 +994,7 @@ export function createMemoryClerkCell(cellId?: string): MemoryClerkCell {
  */
 export function createConformanceRunner(
   authority?: MemoryAuthority,
+  signingKey?: string,
 ): ConformanceRunner {
-  return new ConformanceRunner(authority);
+  return new ConformanceRunner(authority, signingKey ?? 'conformance-test-key');
 }
