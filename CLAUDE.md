@@ -570,12 +570,12 @@ npx claude-flow@v3alpha doctor --fix
 
 ## Publishing to npm
 
-### CRITICAL: ALWAYS PUBLISH BOTH PACKAGES + UPDATE ALL TAGS
+### Publishing Rules
 
-**When publishing CLI changes, you MUST:**
-1. Publish `@claude-flow/cli`
-2. Publish `claude-flow` (umbrella)
-3. Update ALL dist-tags for BOTH packages
+- MUST publish BOTH packages when publishing CLI changes
+- MUST update ALL dist-tags for BOTH packages after publishing
+- Always publish `@claude-flow/cli` first, then `claude-flow` (umbrella)
+- MUST run verification before telling user publishing is complete
 
 ```bash
 # STEP 1: Build and publish CLI
