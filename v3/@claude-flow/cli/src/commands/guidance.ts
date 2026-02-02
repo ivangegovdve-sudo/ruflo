@@ -586,6 +586,7 @@ export const guidanceCommand: Command = {
     gatesCommand,
     statusCommand,
     optimizeCommand,
+    abTestCommand,
   ],
   options: [],
   examples: [
@@ -593,7 +594,8 @@ export const guidanceCommand: Command = {
     { command: 'claude-flow guidance retrieve -t "Fix auth bug"', description: 'Retrieve relevant guidance' },
     { command: 'claude-flow guidance gates -c "rm -rf /"', description: 'Check enforcement gates' },
     { command: 'claude-flow guidance status', description: 'Show control plane status' },
-    { command: 'claude-flow guidance optimize', description: 'Run optimization cycle' },
+    { command: 'claude-flow guidance optimize', description: 'Analyze and optimize CLAUDE.md' },
+    { command: 'claude-flow guidance ab-test', description: 'Run A/B behavioral comparison' },
   ],
   action: async (ctx: CommandContext): Promise<CommandResult> => {
     output.writeln();
@@ -605,7 +607,8 @@ export const guidanceCommand: Command = {
     output.writeln(`  ${output.bold('retrieve')}  Retrieve task-relevant guidance shards`);
     output.writeln(`  ${output.bold('gates')}     Evaluate enforcement gates`);
     output.writeln(`  ${output.bold('status')}    Show control plane status`);
-    output.writeln(`  ${output.bold('optimize')}  Run optimization cycle`);
+    output.writeln(`  ${output.bold('optimize')}  Analyze and optimize CLAUDE.md`);
+    output.writeln(`  ${output.bold('ab-test')}   Run A/B behavioral comparison`);
     output.writeln();
     output.writeln(output.dim('Use claude-flow guidance <subcommand> --help for details'));
 
