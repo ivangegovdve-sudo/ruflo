@@ -17,10 +17,20 @@ export {
   generateConfigToml,
 } from './generators/index.js';
 
+// Re-export skill generator helper
+export { generateBuiltInSkill } from './generators/skill-md.js';
+
+// Re-export config generator helpers
+export { generateMinimalConfigToml, generateCIConfigToml } from './generators/config-toml.js';
+
 // Re-export migrations
 export {
   migrateFromClaudeCode,
   analyzeClaudeMd,
+  generateMigrationReport,
+  convertSkillSyntax,
+  convertSettingsToToml,
+  FEATURE_MAPPINGS,
 } from './migrations/index.js';
 
 // Re-export validators
@@ -30,14 +40,20 @@ export {
   validateConfigToml,
 } from './validators/index.js';
 
-// Main initializer class
-export { CodexInitializer } from './initializer.js';
+// Main initializer class and helper function
+export { CodexInitializer, initializeCodexProject } from './initializer.js';
 
 // Template utilities
 export {
   getTemplate,
   listTemplates,
   BUILT_IN_SKILLS,
+  TEMPLATES,
+  DEFAULT_SKILLS_BY_TEMPLATE,
+  DIRECTORY_STRUCTURE,
+  PLATFORM_MAPPING,
+  GITIGNORE_ENTRIES,
+  AGENTS_OVERRIDE_TEMPLATE,
 } from './templates/index.js';
 
 /**
@@ -55,3 +71,11 @@ export const PACKAGE_INFO = {
   futureUmbrella: 'coflow',
   repository: 'https://github.com/ruvnet/claude-flow',
 } as const;
+
+/**
+ * Default export for convenient imports
+ */
+export default {
+  VERSION,
+  PACKAGE_INFO,
+};
