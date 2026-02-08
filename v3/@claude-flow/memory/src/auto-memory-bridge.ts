@@ -76,6 +76,12 @@ export interface AutoMemoryBridgeConfig {
 
   /** Prune strategy for MEMORY.md (default: 'confidence-weighted') */
   pruneStrategy?: PruneStrategy;
+
+  /** Learning bridge config (ADR-049). When set, insights trigger neural learning. */
+  learning?: LearningBridgeConfig;
+
+  /** Knowledge graph config (ADR-049). When set, graph-aware curation is enabled. */
+  graph?: MemoryGraphConfig;
 }
 
 /** A memory insight to record */
