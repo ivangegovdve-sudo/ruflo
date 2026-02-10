@@ -326,6 +326,11 @@
             "type": "command",
             "timeout": 4000,
             "command": "node /workspaces/claude-flow/v3/@claude-flow/cli/bin/cli.js hooks build-agents --topology hierarchical-mesh --max-agents 15 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "timeout": 6000,
+            "command": "node /workspaces/claude-flow/.claude/helpers/context-persistence-hook.mjs session-start 2>/dev/null || true"
           }
         ]
       }
