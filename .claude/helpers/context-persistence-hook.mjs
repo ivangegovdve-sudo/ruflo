@@ -994,12 +994,19 @@ async function doStatus() {
   const sessions = await backend.listSessions(NAMESPACE);
 
   console.log('\n=== Context Persistence Archive Status ===\n');
-  console.log(`  Backend:     ${type} (${type === 'sqlite' ? ARCHIVE_DB_PATH : type === 'json' ? ARCHIVE_JSON_PATH : 'agentdb'})`);
+  const backendLabel = {
+    sqlite: ARCHIVE_DB_PATH,
+    ruvector: `${process.env.RUVECTOR_HOST || 'N/A'}:${process.env.RUVECTOR_PORT || '5432'}`,
+    agentdb: 'in-memory HNSW',
+    json: ARCHIVE_JSON_PATH,
+  };
+  console.log(`  Backend:     ${type} (${backendLabel[type] || type})`);
   console.log(`  Total:       ${total} entries`);
   console.log(`  Transcripts: ${archiveCount} entries`);
   console.log(`  Namespaces:  ${namespaces.join(', ') || 'none'}`);
   console.log(`  Budget:      ${RESTORE_BUDGET} chars`);
   console.log(`  Sessions:    ${sessions.length}`);
+  console.log(`  Proactive:   enabled (UserPromptSubmit hook)`);
 
   if (sessions.length > 0) {
     console.log('\n  Recent sessions:');
