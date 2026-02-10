@@ -168,18 +168,43 @@ if [ -x "$SWARM_COMMS" ]; then
   QUEUE_PENDING=$(echo "$COMMS_STATS" | jq -r '.queue // 0' 2>/dev/null || echo "0")
 fi
 
-# Get context window usage from Claude Code input
+# Get context window usage from Context Autopilot state (primary) or Claude Code input (fallback)
 CONTEXT_PCT=0
+CONTEXT_TOKENS=""
 CONTEXT_COLOR="${DIM}"
-if [ "$CLAUDE_INPUT" != "{}" ]; then
-  # Try to get remaining percentage directly from Claude Code
+AUTOPILOT_STATUS=""
+AUTOPILOT_STATE="${PROJECT_DIR}/.claude-flow/data/autopilot-state.json"
+
+if [ -f "$AUTOPILOT_STATE" ]; then
+  # Primary: read from autopilot real-time state
+  AP_PCT=$(jq -r '.lastPercentage // 0' "$AUTOPILOT_STATE" 2>/dev/null || echo "0")
+  AP_TOKENS=$(jq -r '.lastTokenEstimate // 0' "$AUTOPILOT_STATE" 2>/dev/null || echo "0")
+  AP_PRUNE=$(jq -r '.pruneCount // 0' "$AUTOPILOT_STATE" 2>/dev/null || echo "0")
+
+  # Convert float to int percentage
+  CONTEXT_PCT=$(echo "$AP_PCT * 100" | bc 2>/dev/null | cut -d. -f1 || echo "0")
+  if [ -z "$CONTEXT_PCT" ] || [ "$CONTEXT_PCT" = "" ]; then CONTEXT_PCT=0; fi
+
+  # Format token count
+  if [ "$AP_TOKENS" -ge 1000 ]; then
+    CONTEXT_TOKENS="$(echo "scale=1; $AP_TOKENS / 1000" | bc 2>/dev/null || echo "?")K"
+  else
+    CONTEXT_TOKENS="${AP_TOKENS}"
+  fi
+
+  # Autopilot active indicator
+  if [ "$AP_PRUNE" -gt 0 ]; then
+    AUTOPILOT_STATUS="${BRIGHT_YELLOW}⟳${AP_PRUNE}${RESET}"
+  else
+    AUTOPILOT_STATUS="${BRIGHT_GREEN}⊘${RESET}"
+  fi
+elif [ "$CLAUDE_INPUT" != "{}" ]; then
+  # Fallback: read from Claude Code input JSON
   CONTEXT_REMAINING=$(echo "$CLAUDE_INPUT" | jq '.context_window.remaining_percentage // null' 2>/dev/null)
 
   if [ "$CONTEXT_REMAINING" != "null" ] && [ -n "$CONTEXT_REMAINING" ]; then
-    # If we have remaining %, convert to used %
     CONTEXT_PCT=$((100 - CONTEXT_REMAINING))
   else
-    # Fallback: calculate from token counts
     CURRENT_USAGE=$(echo "$CLAUDE_INPUT" | jq '.context_window.current_usage // null' 2>/dev/null)
     if [ "$CURRENT_USAGE" != "null" ] && [ "$CURRENT_USAGE" != "" ]; then
       CONTEXT_SIZE=$(echo "$CLAUDE_INPUT" | jq '.context_window.context_window_size // 200000' 2>/dev/null)
@@ -193,15 +218,17 @@ if [ "$CLAUDE_INPUT" != "{}" ]; then
       fi
     fi
   fi
+fi
 
-  # Color based on usage (higher = worse)
-  if [ "$CONTEXT_PCT" -lt 50 ]; then
-    CONTEXT_COLOR="${BRIGHT_GREEN}"
-  elif [ "$CONTEXT_PCT" -lt 75 ]; then
-    CONTEXT_COLOR="${BRIGHT_YELLOW}"
-  else
-    CONTEXT_COLOR="${BRIGHT_RED}"
-  fi
+# Color based on usage thresholds (matches autopilot: 70% warn, 85% prune)
+if [ "$CONTEXT_PCT" -lt 50 ]; then
+  CONTEXT_COLOR="${BRIGHT_GREEN}"
+elif [ "$CONTEXT_PCT" -lt 70 ]; then
+  CONTEXT_COLOR="${BRIGHT_CYAN}"
+elif [ "$CONTEXT_PCT" -lt 85 ]; then
+  CONTEXT_COLOR="${BRIGHT_YELLOW}"
+else
+  CONTEXT_COLOR="${BRIGHT_RED}"
 fi
 
 # Calculate Intelligence Score based on learning patterns and training
