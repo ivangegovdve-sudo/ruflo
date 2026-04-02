@@ -14,7 +14,12 @@ import * as path from 'path';
 
 // ADR-053: Lazy import of AgentDB v3 bridge
 let _bridge: typeof import('./memory-bridge.js') | null | undefined;
+const DEFAULT_BRIDGE_TIMEOUT_MS = 1500;
+const BRIDGE_ENABLED = process.env.RUFLO_ENABLE_AGENTDB_BRIDGE === '1';
+const HEAVY_EMBEDDINGS_ENABLED = process.env.RUFLO_ENABLE_HEAVY_EMBEDDINGS === '1';
+
 async function getBridge(): Promise<typeof import('./memory-bridge.js') | null> {
+  if (!BRIDGE_ENABLED) return null;
   if (_bridge === null) return null;
   if (_bridge) return _bridge;
   try {
@@ -23,6 +28,39 @@ async function getBridge(): Promise<typeof import('./memory-bridge.js') | null> 
   } catch {
     _bridge = null;
     return null;
+  }
+}
+
+function disableBridge(): void {
+  _bridge = null;
+}
+
+async function callBridge<T>(
+  action: () => Promise<T | null | undefined>,
+): Promise<T | null | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutMs = Number(process.env.RUFLO_BRIDGE_TIMEOUT_MS || DEFAULT_BRIDGE_TIMEOUT_MS);
+  const timeoutToken = { timedOut: true } as const;
+
+  try {
+    const result = await Promise.race([
+      action(),
+      new Promise<typeof timeoutToken>((resolve) => {
+        timer = setTimeout(() => resolve(timeoutToken), timeoutMs);
+      })
+    ]) as T | null | undefined | typeof timeoutToken;
+
+    if (result === timeoutToken) {
+      disableBridge();
+      return null;
+    }
+
+    return result as T | null | undefined;
+  } catch {
+    disableBridge();
+    return null;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -518,7 +556,7 @@ export async function addToHNSWIndex(
   // ADR-053: Try AgentDB v3 bridge first
   const bridge = await getBridge();
   if (bridge) {
-    const bridgeResult = await bridge.bridgeAddToHNSW(id, embedding, entry);
+    const bridgeResult = await callBridge(() => bridge.bridgeAddToHNSW(id, embedding, entry));
     if (bridgeResult === true) return true;
   }
 
@@ -555,7 +593,7 @@ export async function searchHNSWIndex(
   // ADR-053: Try AgentDB v3 bridge first
   const bridge = await getBridge();
   if (bridge) {
-    const bridgeResult = await bridge.bridgeSearchHNSW(queryEmbedding, options);
+    const bridgeResult = await callBridge(() => bridge.bridgeSearchHNSW(queryEmbedding, options));
     if (bridgeResult) return bridgeResult;
   }
 
@@ -1111,7 +1149,7 @@ async function activateControllerRegistry(
       return { activated, failed, initTimeMs: performance.now() - startTime };
     }
 
-    const registry = await bridge.getControllerRegistry(dbPath);
+    const registry = await callBridge(() => bridge.getControllerRegistry(dbPath));
     if (!registry) {
       return { activated, failed, initTimeMs: performance.now() - startTime };
     }
@@ -1481,6 +1519,26 @@ interface EmbeddingModel {
 
 let embeddingModelState: EmbeddingModel | null = null;
 
+function setHashEmbeddingFallback(): {
+  success: boolean;
+  dimensions: number;
+  modelName: string;
+  loadTime?: number;
+} {
+  embeddingModelState = {
+    loaded: true,
+    model: null,
+    tokenizer: null,
+    dimensions: 128
+  };
+
+  return {
+    success: true,
+    dimensions: 128,
+    modelName: 'hash-fallback'
+  };
+}
+
 /**
  * Lazy load ONNX embedding model
  * Only loads when first embedding is requested
@@ -1511,7 +1569,7 @@ export async function loadEmbeddingModel(options?: {
   // ADR-053: Try AgentDB v3 bridge first
   const bridge = await getBridge();
   if (bridge) {
-    const bridgeResult = await bridge.bridgeLoadEmbeddingModel();
+    const bridgeResult = await callBridge(() => bridge.bridgeLoadEmbeddingModel());
     if (bridgeResult && bridgeResult.success) {
       // Mark local state as loaded too so subsequent calls use cache
       embeddingModelState = {
@@ -1522,6 +1580,13 @@ export async function loadEmbeddingModel(options?: {
       };
       return bridgeResult;
     }
+  }
+
+  if (!HEAVY_EMBEDDINGS_ENABLED) {
+    return {
+      ...setHashEmbeddingFallback(),
+      loadTime: Date.now() - startTime
+    };
   }
 
   try {
@@ -1599,17 +1664,8 @@ export async function loadEmbeddingModel(options?: {
     }
 
     // No ONNX model available - use fallback
-    embeddingModelState = {
-      loaded: true,
-      model: null, // Will use simple hash-based fallback
-      tokenizer: null,
-      dimensions: 128 // Smaller fallback dimensions
-    };
-
     return {
-      success: true,
-      dimensions: 128,
-      modelName: 'hash-fallback',
+      ...setHashEmbeddingFallback(),
       loadTime: Date.now() - startTime
     };
   } catch (error) {
@@ -1634,7 +1690,7 @@ export async function generateEmbedding(text: string): Promise<{
   // ADR-053: Try AgentDB v3 bridge first
   const bridge = await getBridge();
   if (bridge) {
-    const bridgeResult = await bridge.bridgeGenerateEmbedding(text);
+    const bridgeResult = await callBridge(() => bridge.bridgeGenerateEmbedding(text));
     if (bridgeResult) return bridgeResult;
   }
 
@@ -1989,7 +2045,7 @@ export async function storeEntry(options: {
   // ADR-053: Try AgentDB v3 bridge first
   const bridge = await getBridge();
   if (bridge) {
-    const bridgeResult = await bridge.bridgeStoreEntry(options);
+    const bridgeResult = await callBridge(() => bridge.bridgeStoreEntry(options));
     if (bridgeResult) return bridgeResult;
   }
 
@@ -2120,7 +2176,7 @@ export async function searchEntries(options: {
   // ADR-053: Try AgentDB v3 bridge first
   const bridge = await getBridge();
   if (bridge) {
-    const bridgeResult = await bridge.bridgeSearchEntries(options);
+    const bridgeResult = await callBridge(() => bridge.bridgeSearchEntries(options));
     if (bridgeResult) return bridgeResult;
   }
 
@@ -2286,7 +2342,7 @@ export async function listEntries(options: {
   // ADR-053: Try AgentDB v3 bridge first
   const bridge = await getBridge();
   if (bridge) {
-    const bridgeResult = await bridge.bridgeListEntries(options);
+    const bridgeResult = await callBridge(() => bridge.bridgeListEntries(options));
     if (bridgeResult) return bridgeResult;
   }
 
@@ -2402,7 +2458,7 @@ export async function getEntry(options: {
   // ADR-053: Try AgentDB v3 bridge first
   const bridge = await getBridge();
   if (bridge) {
-    const bridgeResult = await bridge.bridgeGetEntry(options);
+    const bridgeResult = await callBridge(() => bridge.bridgeGetEntry(options));
     if (bridgeResult) return bridgeResult;
   }
 
@@ -2514,7 +2570,7 @@ export async function deleteEntry(options: {
   // ADR-053: Try AgentDB v3 bridge first
   const bridge = await getBridge();
   if (bridge) {
-    const bridgeResult = await bridge.bridgeDeleteEntry(options);
+    const bridgeResult = await callBridge(() => bridge.bridgeDeleteEntry(options));
     if (bridgeResult) return bridgeResult;
   }
 
