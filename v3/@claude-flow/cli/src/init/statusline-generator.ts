@@ -15,7 +15,7 @@ import type { InitOptions } from './types.js';
 /**
  * Generate optimized statusline script
  * Output format:
- * ▊ RuFlo V3 ● user  │  ⎇ branch  │  Opus 4.6
+ * ▊ RuFlo V3.5 ● user  │  ⎇ branch  │  Opus 4.6 (1M context)
  * ─────────────────────────────────────────────────────
  * 🏗️  DDD Domains    [●●○○○]  2/5    ⚡ HNSW 150x
  * 🤖 Swarm  ◉ [ 5/15]  👥 2    🪝 10/17    🟢 CVE 3/3    💾 4MB    🧠  63%
@@ -179,7 +179,7 @@ function getModelName() {
                 const ts = usage[id] && usage[id].lastUsedAt ? new Date(usage[id].lastUsedAt).getTime() : 0;
                 if (ts > latest) { latest = ts; modelId = id; }
               }
-              if (modelId.includes('opus')) return 'Opus 4.6';
+              if (modelId.includes('opus')) return 'Opus 4.6 (1M context)';
               if (modelId.includes('sonnet')) return 'Sonnet 4.6';
               if (modelId.includes('haiku')) return 'Haiku 4.5';
               return modelId.split('-').slice(1, 3).join(' ');
@@ -195,7 +195,7 @@ function getModelName() {
   const settings = getSettings();
   if (settings && settings.model) {
     const m = settings.model;
-    if (m.includes('opus')) return 'Opus 4.6';
+    if (m.includes('opus')) return 'Opus 4.6 (1M context)';
     if (m.includes('sonnet')) return 'Sonnet 4.6';
     if (m.includes('haiku')) return 'Haiku 4.5';
   }
@@ -582,7 +582,7 @@ function generateStatusline() {
   const lines = [];
 
   // Header
-  let header = c.bold + c.brightPurple + '\\u258A RuFlo V3 ' + c.reset;
+  let header = c.bold + c.brightPurple + '\\u258A RuFlo V3.5 ' + c.reset;
   header += (swarm.coordinationActive ? c.brightCyan : c.dim) + '\\u25CF ' + c.brightCyan + git.name + c.reset;
   if (git.gitBranch) {
     header += '  ' + c.dim + '\\u2502' + c.reset + '  ' + c.brightBlue + '\\u23C7 ' + git.gitBranch + c.reset;

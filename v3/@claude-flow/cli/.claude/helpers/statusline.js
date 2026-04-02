@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Claude Flow V3 Statusline Generator
+ * RuFlo V3.5 Statusline Generator
  * Displays real-time V3 implementation progress and system status
  *
  * Usage: node statusline.js [--json] [--compact]
@@ -47,7 +47,7 @@ const c = {
 function getUserInfo() {
   let name = 'user';
   let gitBranch = '';
-  let modelName = 'Opus 4.5';
+  let modelName = 'Opus 4.6 (1M context)';
 
   try {
     name = execSync('git config user.name 2>/dev/null || echo "user"', { encoding: 'utf-8' }).trim();
@@ -242,7 +242,7 @@ function generateStatusline() {
   const lines = [];
 
   // Header Line
-  let header = `${c.bold}${c.brightPurple}▊ Claude Flow V3 ${c.reset}`;
+  let header = `${c.bold}${c.brightPurple}▊ RuFlo V3.5 ${c.reset}`;
   header += `${swarm.coordinationActive ? c.brightCyan : c.dim}● ${c.brightCyan}${user.name}${c.reset}`;
   if (user.gitBranch) {
     header += `  ${c.dim}│${c.reset}  ${c.brightBlue}⎇ ${user.gitBranch}${c.reset}`;

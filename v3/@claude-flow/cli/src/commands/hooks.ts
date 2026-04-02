@@ -3465,7 +3465,7 @@ const statuslineCommand: Command = {
     function getUserInfo() {
       let name = 'user';
       let gitBranch = '';
-      const modelName = 'Opus 4.5';
+      const modelName = 'Opus 4.6 (1M context)';
       const isWindows = process.platform === 'win32';
 
       try {

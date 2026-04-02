@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Claude Flow V3 Statusline Generator
+ * RuFlo V3.5 Statusline Generator
  * Displays real-time V3 implementation progress and system status
  *
  * Usage: node statusline.cjs [options]
@@ -121,8 +121,8 @@ function getUserInfo() {
             }
           }
           // Parse model ID to human-readable name
-          if (modelId.includes('opus')) modelName = 'Opus 4.5';
-          else if (modelId.includes('sonnet')) modelName = 'Sonnet 4';
+          if (modelId.includes('opus')) modelName = 'Opus 4.6 (1M context)';
+          else if (modelId.includes('sonnet')) modelName = 'Sonnet 4.6';
           else if (modelId.includes('haiku')) modelName = 'Haiku 4.5';
           else modelName = modelId.split('-').slice(1, 3).join(' ');
         }
@@ -404,7 +404,7 @@ function generateStatusline() {
   const lines = [];
 
   // Header Line
-  let header = `${c.bold}${c.brightPurple}▊ Claude Flow V3 ${c.reset}`;
+  let header = `${c.bold}${c.brightPurple}▊ RuFlo V3.5 ${c.reset}`;
   header += `${swarm.coordinationActive ? c.brightCyan : c.dim}● ${c.brightCyan}${user.name}${c.reset}`;
   if (user.gitBranch) {
     header += `  ${c.dim}│${c.reset}  ${c.brightBlue}⎇ ${user.gitBranch}${c.reset}`;
@@ -486,7 +486,7 @@ function generateSingleLine() {
   const securityStatus = security.status === 'CLEAN' ? '✓' :
                          security.cvesFixed > 0 ? '~' : '✗';
 
-  return `${c.brightPurple}CF-V3${c.reset} ${c.dim}|${c.reset} ` +
+  return `${c.brightPurple}RuFlo${c.reset} ${c.dim}|${c.reset} ` +
     `${c.cyan}D:${progress.domainsCompleted}/${progress.totalDomains}${c.reset} ${c.dim}|${c.reset} ` +
     `${c.yellow}S:${swarmIndicator}${swarm.activeAgents}/${swarm.maxAgents}${c.reset} ${c.dim}|${c.reset} ` +
     `${security.status === 'CLEAN' ? c.green : c.red}CVE:${securityStatus}${security.cvesFixed}/${security.totalCves}${c.reset} ${c.dim}|${c.reset} ` +
@@ -510,7 +510,7 @@ function generateSafeStatusline() {
   const lines = [];
 
   // Header Line
-  let header = `${c.bold}${c.brightPurple}▊ Claude Flow V3 ${c.reset}`;
+  let header = `${c.bold}${c.brightPurple}▊ RuFlo V3.5 ${c.reset}`;
   header += `${swarm.coordinationActive ? c.brightCyan : c.dim}● ${c.brightCyan}${user.name}${c.reset}`;
   if (user.gitBranch) {
     header += `  ${c.dim}│${c.reset}  ${c.brightBlue}⎇ ${user.gitBranch}${c.reset}`;
@@ -529,16 +529,16 @@ function generateSafeStatusline() {
     `${c.brightYellow}⚡ 1.0x${c.reset} ${c.dim}→${c.reset} ${c.brightYellow}2.49x-7.47x${c.reset}`
   );
 
-  // Line 2 (COLLISION LINE): Swarm status with 24 spaces padding after emoji
-  // The emoji (🤖) is 2 columns. 24 spaces pushes content to column 26, past the collision zone (15-25)
+  // Line 2 (COLLISION LINE): Swarm status with padding after label
+  // The emoji+label is ~10 columns. Padding pushes content past collision zone (cols 15-25)
   const swarmIndicator = swarm.coordinationActive ? `${c.brightGreen}◉${c.reset}` : `${c.dim}○${c.reset}`;
   const agentsColor = swarm.activeAgents > 0 ? c.brightGreen : c.red;
   let securityIcon = security.status === 'CLEAN' ? '🟢' : security.status === 'IN_PROGRESS' ? '🟡' : '🔴';
   let securityColor = security.status === 'CLEAN' ? c.brightGreen : security.status === 'IN_PROGRESS' ? c.brightYellow : c.brightRed;
 
-  // CRITICAL: 24 spaces after 🤖 (emoji is 2 cols, so 2+24=26, past collision zone cols 15-25)
+  // Padding after "🤖 Swarm" (emoji 2 cols + " Swarm" 6 cols = 8, pad 18 to reach col 26)
   lines.push(
-    `${c.brightYellow}🤖${c.reset}                        ` +  // 24 spaces padding
+    `${c.brightYellow}🤖 Swarm${c.reset}                  ` +  // 18 spaces padding
     `${swarmIndicator} [${agentsColor}${String(swarm.activeAgents).padStart(2)}${c.reset}/${c.brightWhite}${swarm.maxAgents}${c.reset}]  ` +
     `${c.brightPurple}👥 ${system.subAgents}${c.reset}  ` +
     `${securityIcon} ${securityColor}CVE ${security.cvesFixed}${c.reset}/${c.brightWhite}${security.totalCves}${c.reset}  ` +

@@ -7,6 +7,44 @@ import type { Command, CommandContext, CommandResult } from '../types.js';
 import { output } from '../output.js';
 import { select, confirm, input } from '../prompt.js';
 import { callMCPTool, MCPClientError } from '../mcp-client.js';
+import * as fs from 'fs';
+import * as path from 'path';
+
+/**
+ * Update swarm-activity.json metrics after agent count changes.
+ * The statusline reads this file to display the swarm agent count.
+ */
+function updateSwarmActivityMetrics(agentCountDelta: number): void {
+  try {
+    const metricsDir = path.join(process.cwd(), '.claude-flow', 'metrics');
+    const activityPath = path.join(metricsDir, 'swarm-activity.json');
+
+    let data: Record<string, unknown> = {
+      timestamp: new Date().toISOString(),
+      swarm: { active: false, agent_count: 0, coordination_active: false },
+    };
+
+    if (fs.existsSync(activityPath)) {
+      data = JSON.parse(fs.readFileSync(activityPath, 'utf-8'));
+    } else {
+      fs.mkdirSync(metricsDir, { recursive: true });
+    }
+
+    const swarm = (data.swarm as Record<string, unknown>) ?? {};
+    const currentCount = Math.max(0, (swarm.agent_count as number) || 0);
+    const newCount = Math.max(0, currentCount + agentCountDelta);
+
+    swarm.agent_count = newCount;
+    swarm.active = newCount > 0;
+    swarm.coordination_active = newCount > 0;
+    data.swarm = swarm;
+    data.timestamp = new Date().toISOString();
+
+    fs.writeFileSync(activityPath, JSON.stringify(data, null, 2));
+  } catch {
+    // Non-critical — don't fail the command if metrics update fails
+  }
+}
 
 // Available agent types with descriptions
 const AGENT_TYPES = [
@@ -146,6 +184,9 @@ const spawnCommand: Command = {
 
       output.writeln();
       output.printSuccess(`Agent ${agentName} spawned successfully`);
+
+      // Update swarm-activity.json so statusline reflects the new agent count
+      updateSwarmActivityMetrics(1);
 
       if (ctx.flags.format === 'json') {
         output.printJson(result);
@@ -417,6 +458,9 @@ const stopCommand: Command = {
       }
 
       output.printSuccess(`Agent ${agentId} stopped successfully`);
+
+      // Update swarm-activity.json so statusline reflects the reduced agent count
+      updateSwarmActivityMetrics(-1);
 
       if (ctx.flags.format === 'json') {
         output.printJson(result);
